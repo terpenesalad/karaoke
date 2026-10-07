@@ -76,10 +76,11 @@ export function startStage() {
         const box = $('#upnext');
         if (m.hide) { box.hidden = true; break; }
         box.hidden = false;
+        $('#upnextWho').textContent = m.who;
         $('#upnextTitle').textContent = m.title;
-        box.querySelector('.upnext-singer').textContent = m.singer ? `Get ready, ${m.singer}!` : '';
-        box.querySelector('.upnext-actions').hidden = true;
-        box.querySelector('.upnext-count').textContent = m.left != null ? `Starting in ${m.left}…` : '';
+        box.classList.toggle('held', m.left == null);
+        box.style.setProperty('--left', m.left == null ? 1 : Math.max(0, m.left / m.total));
+        box.querySelector('.upnext-count').textContent = m.left == null ? '' : `Starting in ${m.left >= 60 ? Math.floor(m.left / 60) + ':' + String(m.left % 60).padStart(2, '0') : m.left + ' s'}`;
         break;
       }
       case 'ended':

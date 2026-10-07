@@ -134,13 +134,29 @@ export function toLRC(lines, meta = {}) {
   return head.concat(body).join('\n') + '\n';
 }
 
+// Text that YouTube's hover-preview player overlays on a search result card. If a title
+// contains any of these, everything from that point on is page furniture, not the title.
+const SCRAPE_MARKERS = /(tap to unmute|if playback doesn'?t begin|up next\b|watch later|include playlist|an error occurred|\b\d+(\.\d+)?x\b(?=[A-Z])|shopping\b|cancel\s*play now)/i;
+export const looksScraped = t => SCRAPE_MARKERS.test(String(t || '')) || String(t || '').length > 110;
+
+/** Make a song title short and readable: drop page junk, "(Karaoke Version)"-style tags and channel suffixes. */
+export function cleanTitle(raw) {
+  let s = String(raw || '').replace(/\s+/g, ' ').trim();
+  const m = SCRAPE_MARKERS.exec(s);
+  if (m) s = s.slice(0, m.index);
+  s = s.replace(/[\[(][^\])]*(karaoke|instrumental|official|lyrics?|video|audio|hd|4k|remaster(ed)?|version|sing ?along)[^\])]*[\])]/gi, '');
+  s = s.replace(/\s+[|•]\s+.*$/, '');                       // "Song | Channel"
+  s = s.replace(/\b(karaoke( version)?|instrumental|with lyrics|lyrics|sing ?along)\b/gi, '');
+  s = s.replace(/\s*[-–—:]\s*$/, '').replace(/^\s*[-–—:]\s*/, '').replace(/\s{2,}/g, ' ').trim();
+  if (s.length > 70) s = s.slice(0, 70).replace(/\s+\S*$/, '') + '…';
+  return s;
+}
+
 /**
  * Guess artist/title from a file name like "Artist - Title (Karaoke Version).mp3".
  */
 export function guessArtistTitle(name) {
-  let s = String(name || '').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/_/g, ' ');
-  s = s.replace(/[\[(][^\])]*(karaoke|instrumental|official|lyrics?|video|audio|hd|4k|remaster(ed)?|version)[^\])]*[\])]/gi, '');
-  s = s.replace(/\b(karaoke|instrumental|with lyrics|lyrics)\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+  const s = cleanTitle(String(name || '').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/_/g, ' '));
   const parts = s.split(/\s+[-–—]\s+/);
   if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
   return { artist: '', title: s };

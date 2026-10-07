@@ -68,15 +68,16 @@
       <div id="lyrics" class="lyrics" aria-hidden="true"></div>
       <div id="lyricsLive" class="sr-only" aria-live="polite"></div>
       <div id="score" class="score" hidden aria-live="off"><span class="score-num">0</span><span class="score-unit">% on key</span></div>
-      <div id="upnext" class="upnext" hidden role="dialog" aria-labelledby="upnextTitle">
+      <div id="upnext" class="upnext" hidden role="dialog" aria-labelledby="upnextWho" aria-describedby="upnextTitle">
         <p class="upnext-label">Up next</p>
+        <p id="upnextWho" class="upnext-who"></p>
         <p id="upnextTitle" class="upnext-title"></p>
-        <p class="upnext-singer"></p>
+        <div class="upnext-timer" aria-hidden="true"><i></i></div>
+        <p class="upnext-count" aria-live="off"></p>
         <div class="upnext-actions">
           <button class="btn primary" id="upnextGo">Start now</button>
-          <button class="btn" id="upnextWait">Wait</button>
+          <button class="btn" id="upnextWait" aria-pressed="false">Hold</button>
         </div>
-        <p class="upnext-count" aria-live="off"></p>
       </div>
       <div id="howl" class="howl" aria-hidden="true">
         <p>MOVE MICROPHONE AWAY FROM SPEAKERS</p>

@@ -169,7 +169,8 @@ ipcMain.on('adblock:get', e => { e.returnValue = !!prefs.adBlock; });
 ipcMain.on('yt:search', (e, q) => { if (fromApp(e)) openYouTube(String(q).slice(0, 200)); });
 ipcMain.on('yt:pick', async (e, { id, title } = {}) => {
   if (!ytWin || e.sender !== ytWin.webContents || !/^[\w-]{11}$/.test(id || '')) return;
-  if (!title) title = await oembedTitle(id);
+  // YouTube's oEmbed title is authoritative; the clicked card's text is only a fallback.
+  title = (await oembedTitle(id)) || title;
   mainWin && mainWin.webContents.send('yt:picked', { id, title: String(title || '').slice(0, 200) });
 });
 async function oembedTitle(id) {

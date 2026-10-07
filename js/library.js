@@ -1,7 +1,7 @@
 // Song library + queue. Built-in sing-alongs are always present; YouTube songs persist
 // everywhere; your own files persist in the desktop app (by path) and for the session on the web.
 import { DEMOS } from './demos.js';
-import { guessArtistTitle } from './lyrics.js';
+import { guessArtistTitle, cleanTitle, looksScraped } from './lyrics.js';
 import { store, uid, h } from './util.js';
 import { ytThumb } from './youtube.js';
 
@@ -21,6 +21,10 @@ export class Library {
     const saved = store.get(LIB_KEY, []);
     this.songs = saved.filter(s => s.kind === 'yt' || (s.kind === 'file' && s.path && host));
     this.queue = store.get('brk2-queue', []).filter(q => this.get(q.songId) || q.songId.startsWith('demo-'));
+    // Older versions could save page text as a YouTube title; tidy those and let the player fix them.
+    for (const s of this.songs) {
+      if (s.kind === 'yt' && looksScraped(s.title)) { s.title = cleanTitle(s.title) || 'YouTube video'; s.needsTitle = true; }
+    }
   }
   onChange(fn) { this.listeners.push(fn); }
   changed() {
@@ -56,7 +60,7 @@ export class Library {
   }
   addYouTube(id, title) {
     let s = this.songs.find(x => x.kind === 'yt' && x.ytId === id);
-    if (s) { if (title && s.title === 'YouTube video') s.title = title; return s; }
+    if (s) { if (title && (s.title === 'YouTube video' || s.needsTitle)) { s.title = guessArtistTitle(title).title || s.title; s.needsTitle = false; } return s; }
     const g = title ? guessArtistTitle(title) : { artist: '', title: '' };
     s = { id: 'yt-' + id, kind: 'yt', ytId: id, title: g.title || title || 'YouTube video', artist: g.artist ? g.artist + ' · YouTube' : 'YouTube', addedAt: Date.now() };
     this.songs.unshift(s);

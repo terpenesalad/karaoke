@@ -226,14 +226,21 @@ kbd { font: inherit; font-size: .85em; font-weight: 700; padding: .05em .45em; b
 .score-unit { font-size: .8rem; color: #d9cde2; font-weight: 600; }
 
 .upnext {
-  position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: .3rem;
-  background: rgba(13, 7, 16, .92); color: #fff; padding: 2rem;
+  position: absolute; inset: 0; z-index: 12; display: grid; place-content: center; justify-items: center;
+  text-align: center; padding: 2rem; background: var(--stage-bg); color: #fff;
 }
-.upnext-label { margin: 0; color: var(--marigold); font-weight: 800; font-size: clamp(1rem, 2.6cqi, 1.6rem); }
-.upnext-title { margin: 0; font-weight: 800; font-size: clamp(1.8rem, 6cqi, 4.2rem); line-height: 1.05; }
-.upnext-singer { margin: 0 0 1rem; font-size: clamp(1.1rem, 3cqi, 2rem); color: #e6dcee; }
+.upnext-label { margin: 0; color: var(--sung); font-weight: 700; font-size: clamp(1rem, 2.4cqi, 1.5rem); }
+.upnext-who { margin: .1em 0 0; font-weight: 800; font-size: clamp(2.2rem, 8cqi, 6rem); line-height: 1.02; max-width: 16ch; overflow-wrap: anywhere; }
+.upnext-title {
+  margin: .5em 0 0; font-weight: 600; font-size: clamp(1.05rem, 2.8cqi, 1.9rem); color: #d9cde2;
+  max-width: min(32ch, 90cqi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.upnext-timer { width: min(16rem, 60cqi); height: 4px; margin: 1.6rem 0 .5rem; border-radius: 99px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.upnext-timer i { display: block; height: 100%; background: var(--sung); transform-origin: left; transform: scaleX(var(--left, 1)); transition: transform 1s linear; }
+.upnext.held .upnext-timer i { transition: none; }
+.upnext-count { margin: 0 0 1.2rem; color: #cdbfd6; font-size: clamp(.9rem, 1.8cqi, 1.1rem); font-variant-numeric: tabular-nums; }
 .upnext-actions { display: flex; gap: .5rem; justify-content: center; }
-.upnext-count { margin: .6rem 0 0; color: #cdbfd6; }
+.is-stage .upnext-actions { display: none; }
 
 /* Feedback warning: a quiet line in the bottom-right corner that breathes in and out
    for as long as the howl lasts, then fades away. Outer element fades; inner one breathes. */

@@ -4,7 +4,7 @@ import { PARAMS, TOGGLES, PRESETS, THEMES, P, resetSettings, saveSettings } from
 
 const fmt = (p, v) => {
   const dec = p.step < 1 ? (p.step < .1 ? 2 : 1) : 0;
-  const sign = v > 0 && (p.unit === 'dB' || p.unit === 's' || p.unit === 'st') ? '+' : '';
+  const sign = v > 0 && (p.unit === 'dB' || p.unit === 'st') ? '+' : '';
   return sign + Number(v).toFixed(dec) + (p.unit ? (p.unit === '%' || p.unit === ':1' ? '' : ' ') + p.unit : '');
 };
 const spoken = (p, v) => fmt(p, v).replace(' dB', ' decibels').replace(' Hz', ' hertz').replace(' ms', ' milliseconds').replace(' st', ' semitones').replace(/%$/, ' percent').replace(' s', ' seconds');

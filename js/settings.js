@@ -36,6 +36,8 @@ export const PARAMS = [
   { id: 'lyricOffset', tab: 'lyrics', grp: 'Timing', label: 'Lyrics early / late', min: -3, max: 3, step: .05, def: 0, unit: 's', perSong: true,
     help: 'Negative shows words sooner. Saved for this song only.' },
   // Display & comfort
+  { id: 'breakSecs', tab: 'settings', grp: 'Queue', label: 'Break between songs', min: 5, max: 90, step: 5, def: 20, unit: 's',
+    help: 'Time for the next singer to grab the mic before their song starts.' },
   { id: 'uiScale', tab: 'settings', grp: 'Display', label: 'Interface size', min: 90, max: 150, step: 5, def: 100, unit: '%' },
   // Fixed header faders
   { id: 'musicVol', def: 80 },
@@ -51,7 +53,7 @@ export const TOGGLES = [
   { id: 'guideMelody', tab: 'lyrics', grp: 'Sing-alongs', label: 'Show the melody lane', sub: 'Notes to aim for and your pitch, on the built-in songs.', def: true },
   { id: 'nextLine', tab: 'lyrics', grp: 'Display', label: 'Show the next line', sub: 'Read ahead while you sing.', def: true },
   { id: 'readLyrics', tab: 'lyrics', grp: 'Display', label: 'Announce each line to screen readers', sub: 'For singers using a screen reader or braille display.', def: false },
-  { id: 'autoNext', tab: 'settings', grp: 'Queue', label: 'Start the next song automatically', sub: 'After a 10-second "up next" card.', def: true },
+  { id: 'autoNext', tab: 'settings', grp: 'Queue', label: 'Start the next song automatically', sub: 'After a short break with an "up next" card. Turn off to start each song yourself.', def: true },
   { id: 'awake', tab: 'settings', grp: 'Queue', label: 'Keep the screen on', sub: 'Stops the screen sleeping mid-song.', def: true },
   { id: 'adBlock', tab: 'settings', grp: 'YouTube', label: 'Block YouTube ads', sub: 'Desktop app only. Ads are blocked before they load; anything that slips through is skipped.', def: true, desktopOnly: true },
   { id: 'hyperFont', tab: 'settings', grp: 'Display', label: 'Extra-legible lettering', sub: 'Uses Atkinson Hyperlegible everywhere (on by default).', def: true },

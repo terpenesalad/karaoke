@@ -440,6 +440,7 @@ function boot() {
 
   function songEnded() {
     setPlayIcon(false);
+    if (isYT()) { if (stage.ytRemote) stage.send({ type: 'yt', cmd: 'stop' }); else yt.stop(); }
     if (scorer && scorer.total > 5) toast(`Nice! You were on key ${scorer.percent}% of the time.`, 6000);
     if (cur) history.push(cur);
     if (lib.queue.length) showUpNext();
@@ -447,33 +448,49 @@ function boot() {
   }
 
   /* ---- queue / up next */
-  let upTimer = null;
+  // Between songs: a quiet card that puts the next singer's name front and centre,
+  // with a break (Settings → Break between songs) to hand over the mic.
+  const up = { timer: null, left: 0, total: 0, held: false, card: null };
+  const fmtLeft = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s} s`;
+  function renderUpNext() {
+    const c = up.card, box = $('#upnext');
+    $('#upnextWho').textContent = c.who;
+    $('#upnextTitle').textContent = c.title;
+    const auto = P.autoNext && !up.held;
+    box.classList.toggle('held', !auto);
+    box.style.setProperty('--left', auto ? Math.max(0, up.left / up.total) : 1);
+    box.querySelector('.upnext-count').textContent = auto ? `Starting in ${fmtLeft(up.left)}` : 'Start when you’re ready';
+    $('#upnextWait').hidden = !P.autoNext;
+    $('#upnextWait').textContent = up.held ? 'Resume' : 'Hold';
+    $('#upnextWait').setAttribute('aria-pressed', String(up.held));
+    broadcast({ type: 'upnext', who: c.who, title: c.title, left: auto ? up.left : null, total: up.total });
+  }
   function showUpNext() {
     const q = lib.queue[0], s = q && lib.get(q.songId);
     if (!s) return;
-    const box = $('#upnext');
-    box.hidden = false;
-    $('#upnextTitle').textContent = s.title;
-    box.querySelector('.upnext-singer').textContent = q.singer ? `Get ready, ${q.singer}!` : 'Who’s singing?';
-    let left = 10;
-    const count = box.querySelector('.upnext-count');
-    const tick = () => {
-      count.textContent = P.autoNext ? `Starting in ${left}…` : '';
-      broadcast({ type: 'upnext', title: s.title, singer: q.singer, left: P.autoNext ? left : null });
-      if (P.autoNext && left-- <= 0) { hideUpNext(); nextFromQueue(); }
-    };
-    clearInterval(upTimer);
-    tick(); upTimer = setInterval(tick, 1000);
+    const singer = (q.singer || '').trim();
+    up.card = singer ? { who: singer, title: s.title } : { who: s.title, title: 'Grab the mic' };
+    up.total = up.left = clamp(Math.round(P.breakSecs || 20), 5, 90);
+    up.held = false;
+    $('#upnext').hidden = false;
+    renderUpNext();
+    clearInterval(up.timer);
+    up.timer = setInterval(() => {
+      if (!P.autoNext || up.held) return;
+      up.left--;
+      if (up.left <= 0) { hideUpNext(); nextFromQueue(); return; }
+      renderUpNext();
+    }, 1000);
     $('#upnextGo').focus();
-    announce(`Up next: ${s.title}${q.singer ? ', sung by ' + q.singer : ''}`);
+    announce(singer ? `Up next, ${singer}, singing ${s.title}.` : `Up next: ${s.title}.`);
   }
   function hideUpNext() {
-    clearInterval(upTimer); upTimer = null;
+    clearInterval(up.timer); up.timer = null;
     $('#upnext').hidden = true;
     broadcast({ type: 'upnext', hide: true });
   }
   $('#upnextGo').onclick = () => { hideUpNext(); nextFromQueue(); };
-  $('#upnextWait').onclick = () => { clearInterval(upTimer); $('#upnext .upnext-count').textContent = 'Paused. Press Start now when you’re ready.'; broadcast({ type: 'upnext', title: $('#upnextTitle').textContent, singer: '', left: null }); };
+  $('#upnextWait').onclick = () => { up.held = !up.held; renderUpNext(); announce(up.held ? 'Countdown on hold' : 'Countdown resumed'); };
   function nextFromQueue(skip) {
     const q = lib.shift();
     if (!q) { if (skip) toast('Nobody’s queued. Use the + next to a song.'); return; }
@@ -596,9 +613,9 @@ function boot() {
   });
   function ytTitle(t) {
     if (!cur || cur.kind !== 'yt' || !t) return;
-    if (cur.title === 'YouTube video') {
+    if (cur.title === 'YouTube video' || cur.needsTitle) {
       const g = guessArtistTitle(t);
-      cur.title = g.title || t; if (g.artist) cur.artist = g.artist + ' · YouTube';
+      cur.title = g.title || t; cur.needsTitle = false; if (g.artist) cur.artist = g.artist + ' · YouTube';
       lib.changed(); setNow(); broadcastSong();
     }
   }

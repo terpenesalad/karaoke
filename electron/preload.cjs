@@ -79,8 +79,10 @@ if (isSearchWindow) {
   const idOf = href => { const m = /(?:[?&]v=|\/shorts\/)([\w-]{11})/.exec(href || ''); return m && m[1]; };
   const titleNear = a => {
     const card = a.closest('ytd-video-renderer, ytd-rich-item-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer, ytm-shorts-lockup-view-model, yt-lockup-view-model');
-    const t = card && card.querySelector('#video-title, a#video-title-link, h3 [title], .yt-lockup-metadata-view-model__title, h3');
-    return ((t && (t.getAttribute('title') || t.textContent)) || a.getAttribute('title') || a.textContent || '').trim();
+    // Only the title element itself: the card also holds the hover-preview player and its overlay text.
+    const t = card && card.querySelector('#video-title, a#video-title-link, .yt-lockup-metadata-view-model__title');
+    const text = (t && (t.getAttribute('title') || t.textContent)) || a.getAttribute('title') || '';
+    return text.replace(/\s+/g, ' ').trim().slice(0, 150);
   };
   const added = new Set();
   let badge;
