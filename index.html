@@ -1,999 +1,211 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="velvet">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#0d1015">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c1222">
+<meta name="description" content="Sing along with your own music, YouTube karaoke videos or the built-in songs. Vocal remover, key change, synced lyrics, live voice effects.">
 <title>Back Room Karaoke</title>
-<style>
-:root{
-  --ink:#0d1015;
-  --panel:#161b23;
-  --panel-2:#1d242e;
-  --line:#28313e;
-  --cream:#efe6d4;
-  --dim:#8d97a6;
-  --music:#6ec8ff;
-  --voice:#ff4d79;
-  --warn:#ffc247;
-  --ok:#5fdb9a;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
-}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0}
-body{
-  background:var(--ink);color:var(--cream);font-family:var(--sans);
-  font-size:16px;line-height:1.4;overscroll-behavior:none;
-  -webkit-text-size-adjust:100%;
-}
-button,input,select{font-family:inherit;font-size:inherit;color:inherit}
-button{background:none;border:0;padding:0;cursor:pointer}
-
-/* ---------- shell ---------- */
-#app{
-  display:grid;height:100%;
-  /* six children: screen, nowbar, transport, mix, pane, tabs */
-  grid-template-rows:auto auto auto auto minmax(0,1fr) auto;
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
-  max-width:620px;margin:0 auto;
-}
-
-/* ---------- screen ---------- */
-#screen{
-  position:relative;background:#000;aspect-ratio:16/9;overflow:hidden;
-  border-bottom:1px solid var(--line);
-}
-#screen video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
-#yt{position:absolute;inset:0}
-#yt iframe{width:100%;height:100%;border:0}
-.hidden{display:none !important}
-#idle{
-  position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:.5rem;
-  text-align:center;padding:1.25rem;
-  background:radial-gradient(120% 90% at 50% 0%,#1b2330 0%,#0b0e13 70%);
-}
-#idle .glyph{
-  width:42px;height:42px;border-radius:50%;
-  border:2px solid var(--voice);
-  box-shadow:0 0 0 6px rgba(255,77,121,.12), inset 0 -14px 0 -8px var(--voice);
-}
-#idle p{margin:0;color:var(--dim);font-size:.85rem;max-width:34ch}
-
-#nowbar{
-  display:flex;gap:.75rem;align-items:baseline;justify-content:space-between;
-  padding:.6rem .9rem;border-bottom:1px solid var(--line);background:var(--panel);
-}
-#songTitle{
-  font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-#clock{font-family:var(--mono);font-size:.8rem;color:var(--dim);font-variant-numeric:tabular-nums;flex:none}
-
-/* ---------- transport ---------- */
-#transport{
-  display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;
-  background:var(--panel);border-bottom:1px solid var(--line);
-}
-.tbtn{
-  width:46px;height:46px;flex:none;border-radius:14px;background:var(--panel-2);
-  border:1px solid var(--line);display:grid;place-content:center;
-}
-.tbtn:active{background:#28323f}
-.tbtn[disabled]{opacity:.35}
-#play{width:58px;height:58px;border-radius:18px;background:var(--cream);border-color:var(--cream)}
-#play svg{fill:#0d1015}
-.tbtn svg{width:20px;height:20px;fill:var(--cream)}
-#play svg{width:24px;height:24px}
-#seek{flex:1;min-width:0}
-
-/* ---------- faders ---------- */
-#mix{padding:.85rem .9rem 1rem;background:var(--panel);border-bottom:1px solid var(--line)}
-.fader{position:relative;margin-bottom:.55rem}
-.fader:last-child{margin-bottom:0}
-.fader .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.15rem}
-.fader .name{font-weight:600;font-size:.9rem}
-.fader .val{font-family:var(--mono);font-size:.82rem;color:var(--dim);font-variant-numeric:tabular-nums}
-.faderrail{position:relative;height:44px}
-/* live mic meter painted behind the voice fader */
-#meterWrap{
-  position:absolute;left:0;right:0;top:17px;height:10px;border-radius:99px;overflow:hidden;
-  background:#0c1016;pointer-events:none;
-}
-#meterFill{height:100%;width:0%;background:var(--ok);transition:width .04s linear}
-#meterPeak{position:absolute;top:0;height:100%;width:2px;background:var(--cream);opacity:.7;left:0}
-.faderrail input[type=range]{position:relative;z-index:2}
-
-input[type=range]{
-  -webkit-appearance:none;appearance:none;width:100%;height:44px;margin:0;background:transparent;
-  display:block;
-}
-input[type=range]:focus-visible{outline:2px solid var(--cream);outline-offset:2px;border-radius:99px}
-input[type=range]::-webkit-slider-runnable-track{
-  height:10px;border-radius:99px;background:#0c1016;border:1px solid #222b36;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;
-  background:linear-gradient(#f7f1e4,#cdc4b2);border:1px solid #6d6659;
-  box-shadow:0 2px 6px rgba(0,0,0,.6);
-}
-input[type=range]::-moz-range-track{height:10px;border-radius:99px;background:#0c1016;border:1px solid #222b36}
-input[type=range]::-moz-range-thumb{
-  width:28px;height:28px;border-radius:50%;background:#f2ecdf;border:1px solid #6d6659;
-}
-.fader[data-ch=music] input[type=range]::-webkit-slider-thumb{background:linear-gradient(#bfe6ff,#5fa8d8);border-color:#2d6f9c}
-.fader[data-ch=voice] input[type=range]::-webkit-slider-thumb{background:linear-gradient(#ffc0d0,#e03a63);border-color:#8e1f39}
-.fader[data-ch=music] input[type=range]::-moz-range-thumb{background:#9fdcff}
-.fader[data-ch=voice] input[type=range]::-moz-range-thumb{background:#ff9bb4}
-
-#micKill{
-  width:100%;margin-top:.7rem;height:48px;border-radius:14px;font-weight:600;
-  border:1px solid var(--line);background:var(--panel-2);
-}
-#micKill[data-muted=true]{background:var(--voice);border-color:var(--voice);color:#20040d}
-
-/* ---------- panes ---------- */
-#pane{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:.9rem .9rem 1.4rem}
-.group{
-  background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  padding:.8rem .85rem;margin-bottom:.8rem;
-}
-.group > h2{
-  margin:.1rem 0 .7rem;font-size:.82rem;font-weight:600;color:var(--dim);
-  display:flex;justify-content:space-between;align-items:center;
-}
-.row{margin-bottom:.35rem}
-.row:last-child{margin-bottom:0}
-.row .head{display:flex;justify-content:space-between;align-items:baseline}
-.row .lbl{font-size:.88rem}
-.row .num{font-family:var(--mono);font-size:.8rem;color:var(--dim);font-variant-numeric:tabular-nums}
-.row.off{opacity:.4}
-.hint{font-size:.78rem;color:var(--dim);margin:.5rem 0 0}
-.hint a{color:var(--music)}
-
-.sw{
-  display:flex;align-items:center;justify-content:space-between;gap:.6rem;
-  width:100%;padding:.55rem 0;text-align:left;
-}
-.sw + .sw{border-top:1px solid #1f2733}
-.sw .t{font-size:.9rem}
-.sw .t small{display:block;color:var(--dim);font-size:.75rem;font-weight:400}
-.pill{
-  flex:none;width:52px;height:30px;border-radius:99px;background:#0c1016;border:1px solid #2b3542;
-  position:relative;transition:background .12s;
-}
-.pill::after{
-  content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
-  background:#5d6672;transition:transform .12s,background .12s;
-}
-[aria-pressed=true] .pill{background:rgba(95,219,154,.2);border-color:var(--ok)}
-[aria-pressed=true] .pill::after{transform:translateX(22px);background:var(--ok)}
-
-.chips{display:flex;flex-wrap:wrap;gap:.4rem}
-.chip{
-  padding:.45rem .75rem;border-radius:99px;border:1px solid var(--line);
-  background:var(--panel-2);font-size:.85rem;
-}
-.chip[aria-pressed=true]{background:var(--cream);color:#0d1015;border-color:var(--cream);font-weight:600}
-
-.btn{
-  display:block;width:100%;height:46px;border-radius:12px;border:1px solid var(--line);
-  background:var(--panel-2);font-weight:600;font-size:.9rem;
-}
-.btn:active{background:#28323f}
-.btn.primary{background:var(--cream);color:#0d1015;border-color:var(--cream)}
-.btn.rec[data-on=true]{background:var(--voice);border-color:var(--voice);color:#20040d}
-.btn + .btn{margin-top:.5rem}
-.field{
-  display:flex;gap:.5rem;
-}
-.field input{
-  flex:1;min-width:0;height:46px;border-radius:12px;border:1px solid var(--line);
-  background:#0c1016;padding:0 .7rem;
-}
-.field .btn{width:auto;padding:0 1rem;flex:none}
-
-ul#queue{list-style:none;margin:0;padding:0}
-ul#queue li{
-  display:flex;align-items:center;gap:.6rem;padding:.6rem 0;border-top:1px solid #1f2733;
-}
-ul#queue li:first-child{border-top:0}
-ul#queue .qname{flex:1;min-width:0;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
-ul#queue li[data-cur=true] .qname{color:var(--music);font-weight:600}
-ul#queue .del{flex:none;width:34px;height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);color:var(--dim)}
-.empty{color:var(--dim);font-size:.85rem;margin:0}
-
-dl.spec{margin:0;font-size:.83rem}
-dl.spec div{display:flex;justify-content:space-between;gap:1rem;padding:.35rem 0;border-top:1px solid #1f2733}
-dl.spec div:first-child{border-top:0}
-dl.spec dt{color:var(--dim)}
-dl.spec dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
-
-/* ---------- tabs ---------- */
-#tabs{
-  display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);
-  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);
-}
-#tabs button{
-  padding:.7rem .2rem calc(.7rem);font-size:.8rem;color:var(--dim);
-  border-top:2px solid transparent;margin-top:-1px;
-}
-#tabs button[aria-selected=true]{color:var(--cream);border-top-color:var(--voice);font-weight:600}
-
-#toast{
-  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));
-  background:var(--cream);color:#0d1015;padding:.55rem .9rem;border-radius:99px;
-  font-size:.85rem;font-weight:600;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;
-  max-width:90vw;text-align:center;
-}
-#toast[data-show=true]{opacity:1}
-
-@media (prefers-reduced-motion:reduce){*{transition:none !important}}
-</style>
+<link rel="icon" href="build/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/app.css">
+<script>
+  // Apply the saved theme before first paint so there is no flash.
+  try { const s = JSON.parse(localStorage.getItem('brk2-settings') || '{}');
+    if (s.theme) document.documentElement.dataset.theme = s.theme;
+    if (s.uiScale) document.documentElement.style.fontSize = (s.uiScale / 100 * 16) + 'px';
+    if (new URLSearchParams(location.search).has('stage')) document.documentElement.classList.add('is-stage');
+  } catch (e) {}
+</script>
+<script type="module" src="js/main.js"></script>
 </head>
 <body>
+<a class="skip" href="#transport">Skip to the player controls</a>
+
 <div id="app">
+  <header id="top">
+    <h1 class="brand"><span class="mic-glyph" aria-hidden="true"></span>Back Room Karaoke</h1>
+    <nav class="top-actions" aria-label="Screen">
+      <button class="ghost" id="stageBtn" aria-pressed="false" title="Open lyrics on a TV or second screen (S)">Stage screen</button>
+      <button class="ghost" id="fullBtn" title="Fullscreen (F)">Fullscreen</button>
+      <button class="ghost" id="keysBtn" title="Keyboard shortcuts (?)">Shortcuts</button>
+    </nav>
+  </header>
 
-  <div id="screen">
-    <video id="v" playsinline webkit-playsinline controlslist="nodownload"></video>
-    <div id="yt" class="hidden"><div id="ytmount"></div></div>
-    <div id="idle">
-      <div class="glyph"></div>
-      <strong>Back Room Karaoke</strong>
-      <p>Tap start, allow the microphone, then load a song from your phone or paste a YouTube link.</p>
-    </div>
-  </div>
-
-  <div id="nowbar">
-    <span id="songTitle">Nothing loaded</span>
-    <span id="clock">0:00 / 0:00</span>
-  </div>
-
-  <div id="transport">
-    <button class="tbtn" id="prev" aria-label="Previous song"><svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6l8-6v12z"/></svg></button>
-    <button class="tbtn" id="play" aria-label="Play"><svg viewBox="0 0 24 24"><path id="playPath" d="M8 5v14l11-7z"/></svg></button>
-    <button class="tbtn" id="next" aria-label="Next song"><svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg></button>
-    <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Song position">
-  </div>
-
-  <div id="mix">
-    <div class="fader" data-ch="music">
-      <div class="head"><span class="name">Music</span><span class="val" id="musicVolVal">80</span></div>
-      <div class="faderrail"><input id="musicVol" type="range" min="0" max="100" value="80" aria-label="Music volume"></div>
-    </div>
-    <div class="fader" data-ch="voice">
-      <div class="head"><span class="name">Voice</span><span class="val" id="vocalVolVal">85</span></div>
-      <div class="faderrail">
-        <div id="meterWrap"><div id="meterFill"></div><div id="meterPeak"></div></div>
-        <input id="vocalVol" type="range" min="0" max="100" value="85" aria-label="Voice volume">
+  <aside id="library" aria-labelledby="libHead">
+    <div class="lib-head">
+      <h2 id="libHead">Songs</h2>
+      <div class="lib-add">
+        <button class="btn primary" id="addFiles">Add music files</button>
+        <button class="btn" id="ytSearchBtn">Find on YouTube</button>
       </div>
+      <label class="search">
+        <span class="sr-only">Search your songs</span>
+        <input id="libFilter" type="search" placeholder="Search your songs" autocomplete="off">
+      </label>
     </div>
-    <button id="micKill" data-muted="false">Microphone is off — tap to start</button>
-  </div>
+    <div id="libList" class="lib-list" role="list" aria-label="Song library"></div>
+    <section id="queueBox" aria-labelledby="queueHead">
+      <div class="queue-head">
+        <h2 id="queueHead">Up next</h2>
+        <label class="singer"><span>Singer</span><input id="singerName" type="text" placeholder="Who’s singing?" autocomplete="off" maxlength="40"></label>
+      </div>
+      <ol id="queue" aria-label="Queue"></ol>
+    </section>
+  </aside>
 
-  <div id="pane"></div>
+  <main id="center">
+    <section id="stage" aria-label="Stage" aria-describedby="nowTitle">
+      <video id="vid" muted playsinline aria-hidden="true" tabindex="-1"></video>
+      <div id="yt" hidden></div>
+      <div id="ytRemote" class="notice" hidden><p>Playing on the stage screen.</p></div>
+      <div id="idle">
+        <div class="idle-inner">
+          <p class="idle-big">Pick a song to start.</p>
+          <p class="idle-small">Add your own music, find a karaoke version on YouTube, or warm up with a built-in sing-along.</p>
+        </div>
+      </div>
+      <canvas id="lane" aria-hidden="true" hidden></canvas>
+      <div id="lyrics" class="lyrics" aria-hidden="true"></div>
+      <div id="lyricsLive" class="sr-only" aria-live="polite"></div>
+      <div id="score" class="score" hidden aria-live="off"><span class="score-num">0</span><span class="score-unit">% on key</span></div>
+      <div id="upnext" class="upnext" hidden role="dialog" aria-labelledby="upnextTitle">
+        <p class="upnext-label">Up next</p>
+        <p id="upnextTitle" class="upnext-title"></p>
+        <p class="upnext-singer"></p>
+        <div class="upnext-actions">
+          <button class="btn primary" id="upnextGo">Start now</button>
+          <button class="btn" id="upnextWait">Wait</button>
+        </div>
+        <p class="upnext-count" aria-live="off"></p>
+      </div>
+      <div id="howl" class="howl" aria-hidden="true">
+        <p>MOVE MICROPHONE AWAY FROM SPEAKERS</p>
+      </div>
+      <div id="busy" class="busy" hidden role="status"><span class="spinner" aria-hidden="true"></span><span class="busy-text"></span></div>
+    </section>
 
-  <nav id="tabs" role="tablist">
-    <button role="tab" data-tab="voice" aria-selected="true">Voice</button>
-    <button role="tab" data-tab="fx" aria-selected="false">Effects</button>
-    <button role="tab" data-tab="songs" aria-selected="false">Songs</button>
-    <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
+    <section id="transport" aria-label="Player">
+      <div class="now">
+        <p id="nowTitle" class="now-title">Nothing playing</p>
+        <p id="nowSub" class="now-sub"></p>
+      </div>
+      <div class="deck">
+        <button class="tbtn" id="prev" aria-label="Back to start, or previous song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+        <button class="tbtn play" id="play" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="playPath" d="M8 5v14l11-7z"/></svg></button>
+        <button class="tbtn" id="next" aria-label="Next song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+        <span class="clock" id="clockNow" aria-hidden="true">0:00</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Song position" aria-valuetext="0:00 of 0:00">
+        <span class="clock" id="clockDur" aria-hidden="true">0:00</span>
+        <button class="tbtn rec" id="recBtn" aria-pressed="false" aria-label="Record this performance" title="Record (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg></button>
+      </div>
+    </section>
+  </main>
+
+  <aside id="console" aria-label="Mixer">
+    <div class="faders">
+      <div class="fader" data-ch="music">
+        <label for="musicVol" class="name">Music</label><output id="musicVolVal" for="musicVol">80</output>
+        <div class="rail"><div class="meter" aria-hidden="true"><i id="musicMeter"></i></div><input id="musicVol" type="range" min="0" max="100" value="80"></div>
+      </div>
+      <div class="fader" data-ch="voice">
+        <label for="vocalVol" class="name">Voice</label><output id="vocalVolVal" for="vocalVol">85</output>
+        <div class="rail"><div class="meter" aria-hidden="true"><i id="micMeter"></i><b id="micPeak"></b></div><input id="vocalVol" type="range" min="0" max="100" value="85"></div>
+      </div>
+      <button id="micBtn" class="mic-btn" data-state="off">Turn on microphone</button>
+      <p id="pitchRead" class="pitch-read" aria-live="off"><span class="pr-note">–</span><span class="pr-label">your note</span></p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Mixer sections">
+      <button role="tab" id="tab-mix" aria-controls="pane" aria-selected="true" data-tab="mix">Mix</button>
+      <button role="tab" id="tab-voice" aria-controls="pane" aria-selected="false" tabindex="-1" data-tab="voice">Voice</button>
+      <button role="tab" id="tab-fx" aria-controls="pane" aria-selected="false" tabindex="-1" data-tab="fx">Effects</button>
+      <button role="tab" id="tab-lyrics" aria-controls="pane" aria-selected="false" tabindex="-1" data-tab="lyrics">Lyrics</button>
+      <button role="tab" id="tab-settings" aria-controls="pane" aria-selected="false" tabindex="-1" data-tab="settings">Settings</button>
+    </div>
+    <div id="pane" role="tabpanel" aria-labelledby="tab-mix" tabindex="0"></div>
+  </aside>
+
+  <nav id="mtabs" aria-label="Sections">
+    <button data-m="library" aria-pressed="false">Songs</button>
+    <button data-m="center" aria-pressed="true">Stage</button>
+    <button data-m="console" aria-pressed="false">Mixer</button>
   </nav>
 </div>
+
+<dialog id="dlgKeys" aria-labelledby="dlgKeysH">
+  <h2 id="dlgKeysH">Keyboard shortcuts</h2>
+  <dl class="keys">
+    <div><dt><kbd>Space</kbd></dt><dd>Play or pause</dd></div>
+    <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Back or forward 5 seconds</dd></div>
+    <div><dt><kbd>N</kbd></dt><dd>Next song in the queue</dd></div>
+    <div><dt><kbd>M</kbd></dt><dd>Mute or unmute the microphone</dd></div>
+    <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Key down or up a semitone</dd></div>
+    <div><dt><kbd>V</kbd></dt><dd>Vocal remover on or off</dd></div>
+    <div><dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Lyrics earlier or later</dd></div>
+    <div><dt><kbd>S</kbd></dt><dd>Open or close the stage screen</dd></div>
+    <div><dt><kbd>F</kbd></dt><dd>Fullscreen</dd></div>
+    <div><dt><kbd>R</kbd></dt><dd>Start or stop recording</dd></div>
+    <div><dt><kbd>/</kbd></dt><dd>Search your songs</dd></div>
+    <div><dt><kbd>?</kbd></dt><dd>This list</dd></div>
+  </dl>
+  <p class="hint">Shortcuts pause while you’re typing in a text box.</p>
+  <form method="dialog"><button class="btn primary">Close</button></form>
+</dialog>
+
+<dialog id="dlgYT" aria-labelledby="dlgYTH">
+  <h2 id="dlgYTH">Find a karaoke version on YouTube</h2>
+  <form id="ytSearchForm" class="field">
+    <label class="sr-only" for="ytQuery">Song and artist</label>
+    <input id="ytQuery" type="search" placeholder="Song and artist" autocomplete="off" required>
+    <button class="btn primary">Search</button>
+  </form>
+  <p class="hint" id="ytSearchHint"></p>
+  <h3>Or paste a link</h3>
+  <form id="ytLinkForm" class="field">
+    <label class="sr-only" for="ytLink">YouTube link</label>
+    <input id="ytLink" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" required>
+    <button class="btn primary">Add</button>
+  </form>
+  <p class="hint">Karaoke uploads have the words on screen already. The Music fader controls their volume; the vocal remover and key change only work on your own files.</p>
+  <form method="dialog"><button class="btn">Close</button></form>
+</dialog>
+
+<dialog id="dlgLyrics" aria-labelledby="dlgLyricsH" class="wide">
+  <h2 id="dlgLyricsH">Lyrics for <span class="dl-song"></span></h2>
+  <div class="ly-tools">
+    <button class="btn" id="lyFind">Find synced lyrics online</button>
+    <button class="btn" id="lyFile">Open .lrc file</button>
+    <button class="btn" id="lySync">Sync by tapping</button>
+  </div>
+  <label class="block" for="lyText">Lyrics (LRC timestamps like [01:23.45], or plain lines to sync by tapping)</label>
+  <textarea id="lyText" rows="14" spellcheck="false"></textarea>
+  <div id="syncBar" class="sync-bar" hidden>
+    <p id="syncLine" class="sync-line" aria-live="polite"></p>
+    <p class="hint">Press <kbd>Space</kbd> or the button as each line starts. <kbd>Backspace</kbd> steps back one line.</p>
+    <div class="row-btns"><button class="btn primary big" id="syncTap">Line starts now</button><button class="btn" id="syncStop">Stop syncing</button></div>
+  </div>
+  <p class="hint" id="lyStatus" role="status"></p>
+  <div class="row-btns">
+    <button class="btn primary" id="lySave">Save lyrics</button>
+    <button class="btn" id="lyExport">Download .lrc</button>
+    <form method="dialog"><button class="btn">Close</button></form>
+  </div>
+</dialog>
+
+<dialog id="dlgName" aria-labelledby="dlgNameH">
+  <h2 id="dlgNameH">Whose birthday is it?</h2>
+  <form method="dialog" id="nameForm" class="field">
+    <label class="sr-only" for="bdayName">Name</label>
+    <input id="bdayName" type="text" autocomplete="off" maxlength="24" placeholder="Name">
+    <button class="btn primary" value="ok">Sing</button>
+  </form>
+</dialog>
+
+<input type="file" id="filePick" multiple hidden accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.m4v,.webm,.mkv,.mov,.lrc,.txt">
+<input type="file" id="lrcPick" hidden accept=".lrc,.txt,text/plain">
+
 <div id="toast" role="status" aria-live="polite"></div>
-
-<script>
-"use strict";
-/* =======================================================================
-   Back Room Karaoke — single file, no build step, no dependencies.
-   Signal path (local files only; YouTube is mixed by the OS, see notes):
-
-   mic -> trim -> highpass -> compressor -> [analyser tap] -> gate
-       -> EQ low/mid/high -> dry ------------------------------\
-                          -> double (2 modulated short delays)-+-> voiceGain
-                          -> delay send (ping-pong + tone) ----|
-                          -> reverb send (predelay+IR+damp) ---/
-
-   media element -> musicGain -> master
-   voiceGain -> master -> safety limiter -> speakers (+ recorder tap)
-   ======================================================================= */
-
-const $ = s => document.querySelector(s);
-const clamp = (v,a,b) => v<a?a:v>b?b:v;
-const store = {
-  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
-  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
-};
-let toastTimer;
-function toast(msg){
-  const t = $('#toast'); t.textContent = msg; t.dataset.show = 'true';
-  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.dataset.show='false', 2600);
-}
-const fmtTime = s => {
-  if(!isFinite(s)||s<0) s=0;
-  const m = Math.floor(s/60), r = Math.floor(s%60);
-  return m + ':' + String(r).padStart(2,'0');
-};
-
-/* ---------------------------------------------------------------- params */
-// Single declarative list. Everything reads from P and applies through apply().
-const PARAMS = [
-  // Voice tab
-  {id:'trim',     tab:'voice', grp:'Input',    label:'Input gain',        min:-12, max:24,   step:.5, def:6,    unit:'dB'},
-  {id:'hpf',      tab:'voice', grp:'Input',    label:'Low cut',           min:40,  max:300,  step:5,  def:95,   unit:'Hz'},
-  {id:'gateThr',  tab:'voice', grp:'Input',    label:'Gate threshold',    min:-75, max:-20,  step:1,  def:-52,  unit:'dB', dep:'gateOn'},
-  {id:'compThr',  tab:'voice', grp:'Shape',    label:'Compressor',        min:-45, max:0,    step:1,  def:-22,  unit:'dB', dep:'compOn'},
-  {id:'compRat',  tab:'voice', grp:'Shape',    label:'Compressor ratio',  min:1,   max:12,   step:.5, def:3.5,  unit:':1', dep:'compOn'},
-  {id:'eqLow',    tab:'voice', grp:'Tone',     label:'Body (200 Hz)',     min:-12, max:12,   step:.5, def:0,    unit:'dB'},
-  {id:'eqMid',    tab:'voice', grp:'Tone',     label:'Presence (2 kHz)',  min:-12, max:12,   step:.5, def:1.5,  unit:'dB'},
-  {id:'eqHigh',   tab:'voice', grp:'Tone',     label:'Air (6 kHz)',       min:-12, max:12,   step:.5, def:2,    unit:'dB'},
-  // Effects tab
-  {id:'verbMix',  tab:'fx',    grp:'Reverb',   label:'Amount',            min:0,   max:100,  step:1,  def:30,   unit:'%'},
-  {id:'verbSize', tab:'fx',    grp:'Reverb',   label:'Room size',         min:.3,  max:6,    step:.1, def:2.2,  unit:'s'},
-  {id:'verbTail', tab:'fx',    grp:'Reverb',   label:'Tail shape',        min:.6,  max:6,    step:.1, def:2.2,  unit:''},
-  {id:'verbDamp', tab:'fx',    grp:'Reverb',   label:'Brightness',        min:900, max:14000,step:100,def:5200, unit:'Hz'},
-  {id:'verbPre',  tab:'fx',    grp:'Reverb',   label:'Pre-delay',         min:0,   max:140,  step:2,  def:22,   unit:'ms'},
-  {id:'dlyMix',   tab:'fx',    grp:'Delay',    label:'Amount',            min:0,   max:100,  step:1,  def:22,   unit:'%'},
-  {id:'dlyTime',  tab:'fx',    grp:'Delay',    label:'Time',              min:40,  max:900,  step:5,  def:300,  unit:'ms'},
-  {id:'dlyFb',    tab:'fx',    grp:'Delay',    label:'Repeats',           min:0,   max:80,   step:1,  def:28,   unit:'%'},
-  {id:'dlyTone',  tab:'fx',    grp:'Delay',    label:'Repeat brightness', min:600, max:12000,step:100,def:4200, unit:'Hz'},
-  {id:'dblMix',   tab:'fx',    grp:'Thicken',  label:'Doubler',           min:0,   max:100,  step:1,  def:0,    unit:'%'},
-  {id:'dblSpread',tab:'fx',    grp:'Thicken',  label:'Doubler width',     min:5,   max:45,   step:1,  def:22,   unit:'ms'},
-  // Mix (rendered in the fixed header, not a pane)
-  {id:'musicVol', tab:null,    def:80},
-  {id:'vocalVol', tab:null,    def:85},
-  {id:'duck',     tab:'setup', grp:'Automatic music dip', label:'Dip depth', min:0, max:70, step:1, def:0, unit:'%', dep:'duckOn'},
-  {id:'speed',    tab:'setup', grp:'Playback', label:'Tempo',             min:70,  max:130,  step:1,  def:100,  unit:'%'},
-];
-const TOGGLES = [
-  {id:'gateOn',  tab:'voice', grp:'Input', label:'Noise gate',  sub:'Silences the mic between lines. Also tames feedback.', def:true},
-  {id:'compOn',  tab:'voice', grp:'Shape', label:'Compressor',  sub:'Evens out loud and quiet singers.', def:true},
-  {id:'duckOn',  tab:'setup', grp:'Automatic music dip', label:'Dip the music while someone sings', sub:'Keeps the vocal on top without riding the fader.', def:false},
-  {id:'awake',   tab:'setup', grp:'Session', label:'Keep the screen on', sub:'Stops the phone sleeping mid-song.', def:true},
-];
-const P = {};
-PARAMS.forEach(p => P[p.id] = p.def);
-TOGGLES.forEach(t => P[t.id] = t.def);
-Object.assign(P, store.get('brk-params') || {});
-const savePs = () => store.set('brk-params', P);
-
-const PRESETS = {
-  'Dry':        {verbMix:4,  dlyMix:0,  dblMix:0,  eqMid:1,   eqHigh:1,  verbSize:1.0, dlyFb:15},
-  'Slapback':   {verbMix:14, dlyMix:26, dlyTime:120, dlyFb:8, dblMix:0,  verbSize:1.1, eqHigh:2.5},
-  'Pop vocal':  {verbMix:26, dlyMix:18, dlyTime:280, dlyFb:22, dblMix:28, eqLow:-1, eqMid:2, eqHigh:3, verbSize:1.8},
-  'Ballad':     {verbMix:44, dlyMix:22, dlyTime:420, dlyFb:30, dblMix:12, verbSize:3.2, verbTail:2.6, eqHigh:2, verbDamp:4200},
-  'Stadium':    {verbMix:62, dlyMix:34, dlyTime:520, dlyFb:44, dblMix:20, verbSize:5.0, verbTail:1.8, verbDamp:6800},
-  'Eighties':   {verbMix:52, dlyMix:40, dlyTime:375, dlyFb:38, dblMix:45, eqHigh:4, eqLow:1.5, verbSize:2.8, verbDamp:9000},
-};
-
-/* ------------------------------------------------------------ audio graph */
-let ctx = null, N = {}, micStream = null, micOn = false, muted = false;
-let elSource = null, elDirect = false;      // elDirect = MediaElementSource unavailable
-let analyBuf = null, lastIRKey = '';
-const dbToGain = db => Math.pow(10, db/20);
-const set = (ap, v, t=.02) => { if(ap) ap.setTargetAtTime(v, ctx.currentTime, t); };
-
-function buildGraph(){
-  const AC = window.AudioContext || window.webkitAudioContext;
-  ctx = new AC({latencyHint:'interactive'});
-
-  N.limiter = ctx.createDynamicsCompressor();
-  N.limiter.threshold.value = -1.5; N.limiter.knee.value = 0;
-  N.limiter.ratio.value = 20; N.limiter.attack.value = .002; N.limiter.release.value = .12;
-  N.limiter.connect(ctx.destination);
-
-  N.master = ctx.createGain();
-  N.master.connect(N.limiter);
-
-  N.recTap = ctx.createMediaStreamDestination();
-  N.master.connect(N.recTap);
-
-  N.music = ctx.createGain(); N.music.connect(N.master);
-  N.voice = ctx.createGain(); N.voice.connect(N.master);
-
-  // --- mic chain nodes (source attaches later)
-  N.trim = ctx.createGain();
-  N.hpf  = ctx.createBiquadFilter(); N.hpf.type='highpass'; N.hpf.Q.value=.7;
-  N.comp = ctx.createDynamicsCompressor(); N.comp.knee.value=6; N.comp.attack.value=.004; N.comp.release.value=.18;
-  N.analy = ctx.createAnalyser(); N.analy.fftSize = 1024; N.analy.smoothingTimeConstant = .3;
-  analyBuf = new Float32Array(N.analy.fftSize);
-  N.gate = ctx.createGain(); N.gate.gain.value = 1;
-  N.eqL = ctx.createBiquadFilter(); N.eqL.type='lowshelf';  N.eqL.frequency.value=200;
-  N.eqM = ctx.createBiquadFilter(); N.eqM.type='peaking';   N.eqM.frequency.value=2000; N.eqM.Q.value=.9;
-  N.eqH = ctx.createBiquadFilter(); N.eqH.type='highshelf'; N.eqH.frequency.value=6000;
-
-  N.trim.connect(N.hpf); N.hpf.connect(N.comp);
-  N.comp.connect(N.analy);
-  N.comp.connect(N.gate);
-  N.gate.connect(N.eqL); N.eqL.connect(N.eqM); N.eqM.connect(N.eqH);
-
-  const bus = N.eqH;
-  N.dry = ctx.createGain(); N.dry.gain.value = 1; bus.connect(N.dry); N.dry.connect(N.voice);
-
-  // doubler: two short modulated delays panned apart
-  N.dblSend = ctx.createGain(); N.dblSend.gain.value = 0; bus.connect(N.dblSend);
-  N.dbl = [];
-  [-1, 1].forEach((side, i) => {
-    const d = ctx.createDelay(.2), pan = ctx.createStereoPanner(), lfo = ctx.createOscillator(), amt = ctx.createGain();
-    d.delayTime.value = .02; pan.pan.value = side * .7;
-    lfo.frequency.value = .18 + i*.11; amt.gain.value = .0025;
-    lfo.connect(amt); amt.connect(d.delayTime); lfo.start();
-    N.dblSend.connect(d); d.connect(pan); pan.connect(N.voice);
-    N.dbl.push({d, lfo});
-  });
-
-  // ping-pong delay
-  N.dlySend = ctx.createGain(); N.dlySend.gain.value = 0; bus.connect(N.dlySend);
-  N.dL = ctx.createDelay(2); N.dR = ctx.createDelay(2);
-  N.fbL = ctx.createGain(); N.fbR = ctx.createGain();
-  N.toneL = ctx.createBiquadFilter(); N.toneL.type='lowpass';
-  N.toneR = ctx.createBiquadFilter(); N.toneR.type='lowpass';
-  N.panL = ctx.createStereoPanner(); N.panL.pan.value = -.75;
-  N.panR = ctx.createStereoPanner(); N.panR.pan.value =  .75;
-  N.dlySend.connect(N.dL);
-  N.dL.connect(N.panL); N.panL.connect(N.voice);
-  N.dR.connect(N.panR); N.panR.connect(N.voice);
-  N.dL.connect(N.toneL); N.toneL.connect(N.fbL); N.fbL.connect(N.dR);
-  N.dR.connect(N.toneR); N.toneR.connect(N.fbR); N.fbR.connect(N.dL);
-
-  // reverb
-  N.verbSend = ctx.createGain(); N.verbSend.gain.value = 0; bus.connect(N.verbSend);
-  N.pre = ctx.createDelay(.5);
-  N.conv = ctx.createConvolver();
-  N.damp = ctx.createBiquadFilter(); N.damp.type='lowpass';
-  N.verbSend.connect(N.pre); N.pre.connect(N.conv); N.conv.connect(N.damp); N.damp.connect(N.voice);
-
-  requestAnimationFrame(loop);
-}
-
-function makeIR(seconds, tail){
-  const rate = ctx.sampleRate, len = Math.max(64, Math.floor(rate * seconds));
-  const buf = ctx.createBuffer(2, len, rate);
-  for(let c=0;c<2;c++){
-    const d = buf.getChannelData(c);
-    for(let i=0;i<len;i++){
-      const t = i/len;
-      // sparse early reflections then smooth diffuse tail
-      const env = Math.pow(1-t, tail);
-      d[i] = (Math.random()*2-1) * env;
-    }
-    // gentle 4ms fade-in so it doesn't click
-    const fi = Math.min(len, Math.floor(rate*.004));
-    for(let i=0;i<fi;i++) d[i] *= i/fi;
-  }
-  return buf;
-}
-
-function apply(){
-  if(!ctx) return;
-  set(N.trim.gain, dbToGain(P.trim));
-  set(N.hpf.frequency, P.hpf);
-  set(N.comp.threshold, P.compOn ? P.compThr : 0);
-  set(N.comp.ratio,     P.compOn ? P.compRat : 1);
-  set(N.eqL.gain, P.eqLow); set(N.eqM.gain, P.eqMid); set(N.eqH.gain, P.eqHigh);
-
-  set(N.dblSend.gain, (P.dblMix/100) * .9);
-  N.dbl.forEach((o,i)=> set(o.d.delayTime, (P.dblSpread + i*5)/1000, .05));
-
-  set(N.dlySend.gain, P.dlyMix/100);
-  set(N.dL.delayTime, P.dlyTime/1000, .05);
-  set(N.dR.delayTime, P.dlyTime/1000 * 1.5, .05);
-  const fb = clamp(P.dlyFb/100, 0, .8);
-  set(N.fbL.gain, fb); set(N.fbR.gain, fb);
-  set(N.toneL.frequency, P.dlyTone); set(N.toneR.frequency, P.dlyTone);
-
-  set(N.verbSend.gain, (P.verbMix/100) * 1.4);
-  set(N.pre.delayTime, P.verbPre/1000, .05);
-  set(N.damp.frequency, P.verbDamp);
-  const key = P.verbSize.toFixed(1) + '|' + P.verbTail.toFixed(1);
-  if(key !== lastIRKey){ lastIRKey = key; N.conv.buffer = makeIR(P.verbSize, P.verbTail); }
-
-  set(N.voice.gain, muted ? 0 : Math.pow(P.vocalVol/100, 1.6) * 2.2);
-  if(!P.duckOn) set(N.music.gain, musicBase());
-  if(elDirect) V.volume = clamp(P.musicVol/100, 0, 1);
-  if(ytPlayer && ytReady) try{ ytPlayer.setVolume(P.musicVol); }catch(e){}
-  V.playbackRate = P.speed/100;
-  if('preservesPitch' in V) V.preservesPitch = true;
-  savePs();
-}
-const musicBase = () => Math.pow(P.musicVol/100, 1.5) * 1.15;
-
-/* --------------------------------------------------------------- mic input */
-async function startMic(){
-  try{
-    if(!ctx) buildGraph();
-    if(navigator.audioSession) { try{ navigator.audioSession.type = 'play-and-record'; }catch(e){} }
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio:{
-        echoCancellation:false,   // must be off — it ducks your voice when music plays
-        noiseSuppression:false,   // off — it chews up singing
-        autoGainControl:false,    // off — we do our own gain
-        channelCount:1
-      },
-      video:false
-    });
-    N.mic = ctx.createMediaStreamSource(micStream);
-    N.mic.connect(N.trim);
-    await ctx.resume();
-    micOn = true; muted = false;
-    $('#micKill').dataset.muted = 'false';
-    $('#micKill').textContent = 'Mute microphone';
-    apply();
-    toast('Microphone live. Use wired output if you can.');
-  }catch(e){
-    toast('Microphone blocked. Check site permissions.');
-    console.error(e);
-  }
-}
-function toggleMute(){
-  if(!micOn){ startMic(); return; }
-  muted = !muted;
-  $('#micKill').dataset.muted = muted ? 'true' : 'false';
-  $('#micKill').textContent = muted ? 'Microphone muted — tap to unmute' : 'Mute microphone';
-  apply();
-}
-
-/* --------------------------------------------------------- meter/gate/duck */
-let peakHold = 0, peakAt = 0;
-function loop(){
-  requestAnimationFrame(loop);
-  if(!ctx || !micOn) return;
-  N.analy.getFloatTimeDomainData(analyBuf);
-  let sum = 0, pk = 0;
-  for(let i=0;i<analyBuf.length;i++){
-    const v = analyBuf[i]; sum += v*v;
-    const a = Math.abs(v); if(a>pk) pk = a;
-  }
-  const rms = Math.sqrt(sum/analyBuf.length);
-  const db = 20*Math.log10(rms + 1e-9);
-
-  // meter: -60..0 dB mapped to 0..100%
-  const pct = clamp((db + 60)/60, 0, 1) * 100;
-  const fill = $('#meterFill');
-  fill.style.width = (muted ? 0 : pct) + '%';
-  fill.style.background = pk > .96 ? 'var(--voice)' : pk > .7 ? 'var(--warn)' : 'var(--ok)';
-  const now = performance.now();
-  if(pct >= peakHold || now - peakAt > 900){ peakHold = pct; peakAt = now; }
-  $('#meterPeak').style.left = 'calc(' + clamp(peakHold,0,100) + '% - 1px)';
-
-  if(P.gateOn){
-    const open = db > P.gateThr;
-    N.gate.gain.setTargetAtTime(open ? 1 : 0, ctx.currentTime, open ? .004 : .07);
-  } else if(Math.abs(N.gate.gain.value - 1) > .001){
-    N.gate.gain.setTargetAtTime(1, ctx.currentTime, .01);
-  }
-
-  if(P.duckOn){
-    const amt = clamp((db + 48)/26, 0, 1) * (P.duck/100) * (muted ? 0 : 1);
-    N.music.gain.setTargetAtTime(musicBase() * (1 - amt), ctx.currentTime, .09);
-  }
-}
-
-/* ------------------------------------------------------------------ player */
-const V = $('#v');
-let queue = [], cur = -1, mode = 'none';   // 'file' | 'yt' | 'none'
-let ytPlayer = null, ytReady = false, ytPoll = null;
-
-function attachElement(){
-  if(elSource || elDirect) return;
-  try{
-    elSource = ctx.createMediaElementSource(V);
-    elSource.connect(N.music);
-  }catch(e){
-    elDirect = true;  // fall back to element volume; no dip, no recording of music
-    console.warn('MediaElementSource unavailable, using direct output', e);
-  }
-}
-
-async function playIndex(i){
-  if(i<0 || i>=queue.length) return;
-  if(!ctx) buildGraph();
-  await ctx.resume();
-  hideYT();
-  cur = i; mode = 'file';
-  const item = queue[i];
-  V.src = item.url;
-  V.classList.remove('hidden');
-  $('#idle').classList.add('hidden');
-  attachElement();
-  apply();
-  try{ await V.play(); }catch(e){ toast('Tap play to start'); }
-  $('#songTitle').textContent = item.name;
-  renderQueue();
-}
-
-function hideYT(){
-  $('#yt').classList.add('hidden');
-  if(ytPlayer && ytReady) try{ ytPlayer.stopVideo(); }catch(e){}
-  clearInterval(ytPoll); ytPoll = null;
-}
-
-function loadYouTube(idOrList){
-  mode = 'yt';
-  V.pause(); V.removeAttribute('src'); V.load(); V.classList.add('hidden');
-  $('#idle').classList.add('hidden');
-  $('#yt').classList.remove('hidden');
-  $('#songTitle').textContent = 'YouTube';
-  const boot = () => {
-    if(ytPlayer && ytReady){
-      if(idOrList.list) ytPlayer.loadPlaylist({list:idOrList.list, listType:'playlist'});
-      else ytPlayer.loadVideoById(idOrList.id);
-      ytPlayer.setVolume(P.musicVol);
-      return;
-    }
-    ytPlayer = new YT.Player('ytmount', {
-      width:'100%', height:'100%',
-      videoId: idOrList.id || undefined,
-      playerVars: Object.assign({playsinline:1, rel:0, modestbranding:1, iv_load_policy:3},
-        idOrList.list ? {list:idOrList.list, listType:'playlist'} : {}),
-      events:{
-        onReady(e){
-          ytReady = true; e.target.setVolume(P.musicVol); e.target.playVideo();
-          ytPoll = setInterval(ytTick, 500);
-          try{ $('#songTitle').textContent = e.target.getVideoData().title || 'YouTube'; }catch(err){}
-        },
-        onStateChange(e){
-          if(e.data === YT.PlayerState.PLAYING){
-            setPlayIcon(true);
-            try{ $('#songTitle').textContent = e.target.getVideoData().title || 'YouTube'; }catch(err){}
-          } else if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED){
-            setPlayIcon(false);
-          }
-        },
-        onError(){ toast('That video can’t be embedded. Try another upload.'); }
-      }
-    });
-  };
-  if(window.YT && window.YT.Player) boot();
-  else{
-    window.onYouTubeIframeAPIReady = boot;
-    if(!document.getElementById('ytapi')){
-      const s = document.createElement('script');
-      s.id = 'ytapi'; s.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(s);
-    }
-  }
-}
-function ytTick(){
-  if(!ytPlayer || !ytReady) return;
-  try{
-    const t = ytPlayer.getCurrentTime(), d = ytPlayer.getDuration();
-    $('#clock').textContent = fmtTime(t) + ' / ' + fmtTime(d);
-    if(!seeking && d) $('#seek').value = Math.round(t/d*1000);
-  }catch(e){}
-}
-function parseYT(raw){
-  const s = raw.trim();
-  if(!s) return null;
-  const list = s.match(/[?&]list=([A-Za-z0-9_-]+)/);
-  if(list) return {list:list[1]};
-  const m = s.match(/(?:v=|youtu\.be\/|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/);
-  if(m) return {id:m[1]};
-  if(/^[A-Za-z0-9_-]{11}$/.test(s)) return {id:s};
-  return null;
-}
-
-function setPlayIcon(playing){
-  $('#playPath').setAttribute('d', playing ? 'M7 5h4v14H7zM13 5h4v14h-4z' : 'M8 5v14l11-7z');
-  $('#play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
-}
-async function togglePlay(){
-  if(ctx) await ctx.resume();
-  if(mode === 'yt' && ytPlayer && ytReady){
-    const st = ytPlayer.getPlayerState();
-    if(st === YT.PlayerState.PLAYING) ytPlayer.pauseVideo(); else ytPlayer.playVideo();
-    return;
-  }
-  if(!V.src){ if(queue.length) playIndex(0); else toast('Add a song first'); return; }
-  if(V.paused) V.play(); else V.pause();
-}
-
-let seeking = false;
-$('#seek').addEventListener('pointerdown', ()=>seeking=true);
-$('#seek').addEventListener('pointerup',   ()=>seeking=false);
-$('#seek').addEventListener('change', e => {
-  const f = e.target.value/1000;
-  seeking = false;
-  if(mode==='yt' && ytPlayer && ytReady){ try{ ytPlayer.seekTo(ytPlayer.getDuration()*f, true); }catch(err){} return; }
-  if(isFinite(V.duration)) V.currentTime = V.duration * f;
-});
-V.addEventListener('timeupdate', ()=>{
-  if(mode!=='file') return;
-  $('#clock').textContent = fmtTime(V.currentTime) + ' / ' + fmtTime(V.duration);
-  if(!seeking && isFinite(V.duration) && V.duration) $('#seek').value = Math.round(V.currentTime/V.duration*1000);
-});
-V.addEventListener('play',  ()=>setPlayIcon(true));
-V.addEventListener('pause', ()=>setPlayIcon(false));
-V.addEventListener('ended', ()=>{ if(cur < queue.length-1) playIndex(cur+1); else setPlayIcon(false); });
-$('#play').onclick = togglePlay;
-$('#prev').onclick = ()=>{
-  if(mode==='yt' && ytPlayer && ytReady){ try{ ytPlayer.previousVideo(); }catch(e){} return; }
-  if(V.currentTime > 4){ V.currentTime = 0; return; }
-  playIndex(cur-1);
-};
-$('#next').onclick = ()=>{
-  if(mode==='yt' && ytPlayer && ytReady){ try{ ytPlayer.nextVideo(); }catch(e){} return; }
-  playIndex(cur+1);
-};
-$('#micKill').onclick = toggleMute;
-$('#idle').onclick = ()=>{ if(!micOn) startMic(); };
-
-/* ----------------------------------------------------------------- recorder */
-let rec = null, recChunks = [];
-function toggleRec(btn){
-  if(!ctx){ toast('Start the microphone first'); return; }
-  if(rec && rec.state === 'recording'){ rec.stop(); return; }
-  try{
-    recChunks = [];
-    const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(m => MediaRecorder.isTypeSupported(m));
-    rec = new MediaRecorder(N.recTap.stream, mime ? {mimeType:mime} : undefined);
-    rec.ondataavailable = e => { if(e.data.size) recChunks.push(e.data); };
-    rec.onstop = () => {
-      btn.dataset.on = 'false'; btn.textContent = 'Record the performance';
-      const blob = new Blob(recChunks, {type: rec.mimeType});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'karaoke-' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.webm';
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 10000);
-      toast('Saved to your downloads');
-    };
-    rec.start();
-    btn.dataset.on = 'true'; btn.textContent = 'Stop and save';
-    toast(elDirect || mode==='yt' ? 'Recording voice only (music not routable)' : 'Recording the full mix');
-  }catch(e){ toast('Recording not supported in this browser'); }
-}
-
-/* -------------------------------------------------------------- screen lock */
-let wakeLock = null;
-async function setAwake(on){
-  try{
-    if(on && 'wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); }
-    else if(wakeLock){ await wakeLock.release(); wakeLock = null; }
-  }catch(e){}
-}
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && P.awake) setAwake(true);
-});
-
-/* ------------------------------------------------------------------- panes */
-function paramRow(p){
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
-  wrap.dataset.pid = p.id;
-  wrap.innerHTML =
-    '<div class="head"><span class="lbl"></span><span class="num"></span></div>' +
-    '<input type="range">';
-  wrap.querySelector('.lbl').textContent = p.label;
-  const inp = wrap.querySelector('input');
-  Object.assign(inp, {min:p.min, max:p.max, step:p.step, value:P[p.id]});
-  inp.setAttribute('aria-label', p.label);
-  const num = wrap.querySelector('.num');
-  const show = () => {
-    const v = P[p.id];
-    const dec = p.step < 1 ? 1 : 0;
-    num.textContent = (v>0 && p.unit==='dB' ? '+' : '') + v.toFixed(dec) + (p.unit ? ' '+p.unit : '');
-  };
-  inp.addEventListener('input', ()=>{ P[p.id] = parseFloat(inp.value); show(); apply(); });
-  show();
-  return wrap;
-}
-function toggleRow(t){
-  const b = document.createElement('button');
-  b.className = 'sw'; b.setAttribute('aria-pressed', String(!!P[t.id]));
-  b.innerHTML = '<span class="t"></span><span class="pill"></span>';
-  b.querySelector('.t').innerHTML = '';
-  const label = document.createElement('span'); label.textContent = t.label;
-  const sub = document.createElement('small'); sub.textContent = t.sub || '';
-  b.querySelector('.t').append(label, sub);
-  b.onclick = ()=>{
-    P[t.id] = !P[t.id];
-    b.setAttribute('aria-pressed', String(P[t.id]));
-    if(t.id === 'awake') setAwake(P[t.id]);
-    apply(); refreshDeps();
-  };
-  return b;
-}
-function refreshDeps(){
-  document.querySelectorAll('.row[data-pid]').forEach(r => {
-    const p = PARAMS.find(x=>x.id===r.dataset.pid);
-    if(p && p.dep) r.classList.toggle('off', !P[p.dep]);
-  });
-}
-
-function renderPane(tab){
-  const pane = $('#pane');
-  pane.innerHTML = '';
-  const groups = new Map();
-  const need = name => {
-    if(!groups.has(name)){
-      const g = document.createElement('section'); g.className = 'group';
-      const h = document.createElement('h2'); h.textContent = name;
-      g.appendChild(h); groups.set(name, g); pane.appendChild(g);
-    }
-    return groups.get(name);
-  };
-
-  if(tab === 'fx'){
-    const g = need('Presets');
-    const chips = document.createElement('div'); chips.className = 'chips';
-    Object.keys(PRESETS).forEach(name => {
-      const c = document.createElement('button');
-      c.className='chip'; c.textContent=name; c.setAttribute('aria-pressed','false');
-      c.onclick = ()=>{
-        Object.assign(P, PRESETS[name]); apply();
-        chips.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','false'));
-        c.setAttribute('aria-pressed','true');
-        renderPane('fx');
-        setTimeout(()=>{
-          const cc = [...$('#pane').querySelectorAll('.chip')].find(x=>x.textContent===name);
-          if(cc) cc.setAttribute('aria-pressed','true');
-        },0);
-      };
-      chips.appendChild(c);
-    });
-    g.appendChild(chips);
-  }
-
-  TOGGLES.filter(t=>t.tab===tab).forEach(t => need(t.grp).appendChild(toggleRow(t)));
-  PARAMS.filter(p=>p.tab===tab).forEach(p => need(p.grp).appendChild(paramRow(p)));
-
-  if(tab === 'voice'){
-    const g = need('Feedback');
-    g.insertAdjacentHTML('beforeend',
-      '<p class="hint">Howling means the mic is hearing the speaker. Point the speaker away from the phone, ' +
-      'drop <em>Air</em>, raise the gate threshold, or pull Voice down a few notches.</p>');
-  }
-
-  if(tab === 'songs'){
-    const g = need('From this phone');
-    const pick = document.createElement('button');
-    pick.className = 'btn primary'; pick.textContent = 'Add songs or videos';
-    pick.onclick = ()=>$('#filepick').click();
-    g.appendChild(pick);
-    g.insertAdjacentHTML('beforeend','<p class="hint">MP3, M4A, WAV, MP4, WebM. Files stay on the device — nothing is uploaded.</p>');
-
-    const q = need('Queue');
-    const ul = document.createElement('ul'); ul.id = 'queue';
-    q.appendChild(ul);
-    const clr = document.createElement('button');
-    clr.className='btn'; clr.textContent='Clear queue';
-    clr.onclick = ()=>{ queue.forEach(x=>URL.revokeObjectURL(x.url)); queue=[]; cur=-1; renderQueue(); };
-    q.appendChild(clr);
-
-    const y = need('From YouTube');
-    const f = document.createElement('div'); f.className='field';
-    f.innerHTML = '<input id="ytin" type="url" inputmode="url" placeholder="Paste a link or playlist" aria-label="YouTube link">' +
-                  '<button class="btn primary" id="ytgo">Load</button>';
-    y.appendChild(f);
-    y.insertAdjacentHTML('beforeend',
-      '<p class="hint">YouTube plays in its own player, so the Music fader controls it but the effects, ' +
-      'automatic dip and recording only cover your voice. Search “<em>song name</em> karaoke” on YouTube, then paste the link here.</p>');
-    $('#ytgo').onclick = ()=>{
-      const parsed = parseYT($('#ytin').value);
-      if(!parsed){ toast('That doesn’t look like a YouTube link'); return; }
-      loadYouTube(parsed);
-    };
-    renderQueue();
-  }
-
-  if(tab === 'setup'){
-    const g = need('Session');
-    const r = document.createElement('button');
-    r.className = 'btn rec'; r.dataset.on = 'false'; r.textContent = 'Record the performance';
-    r.onclick = ()=>toggleRec(r);
-    g.appendChild(r);
-    const rst = document.createElement('button');
-    rst.className='btn'; rst.textContent='Reset all settings';
-    rst.onclick = ()=>{
-      PARAMS.forEach(p=>P[p.id]=p.def); TOGGLES.forEach(t=>P[t.id]=t.def);
-      syncMix(); apply(); renderPane('setup'); toast('Back to defaults');
-    };
-    g.appendChild(rst);
-
-    const g2 = need('Latency');
-    const dl = document.createElement('dl'); dl.className='spec';
-    const rows = [
-      ['Output delay', ctx ? Math.round(((ctx.outputLatency||0)+(ctx.baseLatency||0))*1000)+' ms' : '—'],
-      ['Sample rate', ctx ? (ctx.sampleRate/1000).toFixed(1)+' kHz' : '—'],
-      ['Mic', micOn ? 'live' : 'off'],
-      ['Music routing', elDirect ? 'direct (limited)' : mode==='yt' ? 'YouTube player' : 'through the mixer']
-    ];
-    rows.forEach(([k,v])=>{
-      const d=document.createElement('div');
-      const dt=document.createElement('dt'); dt.textContent=k;
-      const dd=document.createElement('dd'); dd.textContent=v;
-      d.append(dt,dd); dl.appendChild(d);
-    });
-    g2.appendChild(dl);
-    g2.insertAdjacentHTML('beforeend',
-      '<p class="hint">Bluetooth speakers add 100–250 ms on top of this, which is enough to throw a singer off. ' +
-      'A cable or a USB-C interface is the single biggest improvement you can make.</p>');
-  }
-
-  refreshDeps();
-}
-
-function renderQueue(){
-  const ul = document.getElementById('queue');
-  if(!ul) return;
-  ul.innerHTML = '';
-  if(!queue.length){
-    ul.insertAdjacentHTML('beforeend','<li><p class="empty">Nothing queued yet.</p></li>');
-    return;
-  }
-  queue.forEach((item,i)=>{
-    const li = document.createElement('li');
-    li.dataset.cur = String(i===cur && mode==='file');
-    const b = document.createElement('button'); b.className='qname'; b.textContent = item.name;
-    b.onclick = ()=>playIndex(i);
-    const d = document.createElement('button'); d.className='del'; d.textContent='×';
-    d.setAttribute('aria-label','Remove ' + item.name);
-    d.onclick = ()=>{
-      URL.revokeObjectURL(item.url);
-      queue.splice(i,1);
-      if(i===cur){ cur=-1; } else if(i<cur){ cur--; }
-      renderQueue();
-    };
-    li.append(b,d); ul.appendChild(li);
-  });
-}
-
-const fp = document.createElement('input');
-fp.type='file'; fp.id='filepick'; fp.multiple=true;
-fp.accept='audio/*,video/*,.mp3,.m4a,.wav,.ogg,.flac,.mp4,.webm,.mov';
-fp.style.display='none';
-document.body.appendChild(fp);
-fp.addEventListener('change', ()=>{
-  [...fp.files].forEach(f=>queue.push({name:f.name.replace(/\.[^.]+$/,''), url:URL.createObjectURL(f)}));
-  fp.value='';
-  renderQueue();
-  if(cur === -1 && queue.length) playIndex(0);
-  toast(queue.length + (queue.length===1?' song ready':' songs ready'));
-});
-
-/* ------------------------------------------------------------------- header */
-function syncMix(){
-  $('#musicVol').value = P.musicVol; $('#musicVolVal').textContent = P.musicVol;
-  $('#vocalVol').value = P.vocalVol; $('#vocalVolVal').textContent = P.vocalVol;
-}
-$('#musicVol').addEventListener('input', e=>{
-  P.musicVol = parseFloat(e.target.value); $('#musicVolVal').textContent = P.musicVol; apply();
-});
-$('#vocalVol').addEventListener('input', e=>{
-  P.vocalVol = parseFloat(e.target.value); $('#vocalVolVal').textContent = P.vocalVol; apply();
-});
-syncMix();
-
-document.querySelectorAll('#tabs button').forEach(b=>{
-  b.onclick = ()=>{
-    document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected','false'));
-    b.setAttribute('aria-selected','true');
-    renderPane(b.dataset.tab);
-    $('#pane').scrollTop = 0;
-  };
-});
-renderPane('voice');
-if(P.awake) document.addEventListener('pointerdown', ()=>setAwake(true), {once:true});
-
-// installable without a second file
-try{
-  const mf = {
-    name:'Back Room Karaoke', short_name:'Karaoke', display:'standalone',
-    background_color:'#0d1015', theme_color:'#0d1015', start_url:'.',
-    icons:[{src:'data:image/svg+xml;base64,' + btoa(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#0d1015"/>' +
-      '<circle cx="256" cy="196" r="86" fill="none" stroke="#ff4d79" stroke-width="26"/>' +
-      '<rect x="240" y="282" width="32" height="150" rx="16" fill="#efe6d4"/></svg>'
-    ), sizes:'512x512', type:'image/svg+xml'}]
-  };
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = URL.createObjectURL(new Blob([JSON.stringify(mf)], {type:'application/manifest+json'}));
-  document.head.appendChild(link);
-}catch(e){}
-</script>
+<div id="sr-status" class="sr-only" aria-live="polite"></div>
+<div id="sr-alert" class="sr-only" role="alert"></div>
+<div id="dropHint" hidden><p>Drop music, videos or .lrc lyric files to add them</p></div>
 </body>
 </html>

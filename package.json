@@ -1,0 +1,48 @@
+{
+  "name": "back-room-karaoke",
+  "productName": "Back Room Karaoke",
+  "version": "2.0.0",
+  "description": "Karaoke for your living room: vocal remover, key change, synced lyrics, live voice effects, YouTube karaoke, stage screen.",
+  "author": "terpenesalad",
+  "homepage": "https://github.com/terpenesalad/karaoke",
+  "main": "electron/main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-all.mjs",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.6.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.github.terpenesalad.karaoke",
+    "productName": "Back Room Karaoke",
+    "copyright": "terpenesalad",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "index.html", "css/**", "js/**", "fonts/**", "build/icon.svg", "build/icon.png",
+      "electron/**", "package.json", "!**/*.test.js"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Back Room Karaoke",
+      "artifactName": "Back-Room-Karaoke-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Back-Room-Karaoke-${version}-Portable.${ext}"
+    }
+  }
+}
