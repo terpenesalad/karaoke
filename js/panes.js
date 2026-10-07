@@ -70,7 +70,9 @@ export function renderPane(app, tab) {
 
   if (tab === 'mix') {
     const g = group('Backing track');
-    if (cur && cur.kind === 'yt') g.append(h('p.hint', null, 'This is a YouTube video, so only the Music fader and Tempo apply. The vocal remover and key change work on your own files and the sing-alongs.'));
+    if (cur && cur.kind === 'yt') g.append(h('p.hint', null, app.host
+      ? 'YouTube video: Music fader, Key and Tempo apply. Changing the key plays it on YouTube’s own page so its audio can be shifted (about a tenth of a second behind the picture). The vocal remover only works on your own files.'
+      : 'YouTube video: the Music fader and Tempo apply. Changing the key of YouTube videos needs the Kami-oke desktop app. The vocal remover works on your own files.'));
   }
   if (tab === 'fx') {
     const g = group('Presets');

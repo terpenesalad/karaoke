@@ -107,6 +107,40 @@ if (pageInit) {
     @keyframes kamioke-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
   `);
   const video = () => document.querySelector('#movie_player video') || document.querySelector('video');
+  // Key change: route the page's audio through the shifter (built on first use; a media element
+  // can only be connected once, so after that the audio always flows through it).
+  const audio = { ctx: null, node: null, gain: null, el: null, failed: false };
+  async function setKey(st) {
+    pageInit.key = st;
+    if (audio.node) { audio.node.port.postMessage({ semitones: st }); return; }
+    const v = video();
+    if (!st || !v || audio.failed) return;
+    try {
+      audio.ctx = new AudioContext({ latencyHint: 'playback' });
+      const url = URL.createObjectURL(new Blob([pageInit.pitchSrc], { type: 'text/javascript' }));
+      await audio.ctx.audioWorklet.addModule(url);
+      audio.node = new AudioWorkletNode(audio.ctx, 'kamioke-pitch', { outputChannelCount: [2] });
+      audio.gain = audio.ctx.createGain();
+      audio.el = v;
+      audio.ctx.createMediaElementSource(v).connect(audio.node);
+      audio.node.connect(audio.gain); audio.gain.connect(audio.ctx.destination);
+      audio.node.port.postMessage({ semitones: pageInit.key });
+      if (audio.ctx.state !== 'running') await audio.ctx.resume();
+      if (pageInit.debug) { // automated tests only: publish levels at a few test-tone frequencies
+        const an = audio.ctx.createAnalyser(); an.fftSize = 16384; audio.gain.connect(an);
+        const spec = new Float32Array(an.frequencyBinCount), hz = audio.ctx.sampleRate / an.fftSize;
+        setInterval(() => {
+          an.getFloatFrequencyData(spec);
+          const at = f => { const b = Math.round(f / hz); return Math.round(Math.max(spec[b - 1], spec[b], spec[b + 1])); };
+          document.documentElement.dataset.kamiokeSpec = JSON.stringify(Object.fromEntries([82.4, 92.5, 261.6, 293.7, 329.6, 370, 392, 440].map(f => [f, at(f)])));
+        }, 400);
+      }
+      ipcRenderer.send('ytpage:state', { keyOk: true });
+    } catch (err) {
+      audio.failed = true;
+      ipcRenderer.send('ytpage:state', { keyFailed: String(err && err.message || err).slice(0, 200) });
+    }
+  }
   const player = () => document.getElementById('movie_player');
   let applied = false, lastSent = '', endedSent = false;
   const apply = v => {
@@ -123,7 +157,7 @@ if (pageInit) {
     if (!v) return;
     window.dispatchEvent(new Event('resize'));
     const ad = !!(pl && (pl.classList.contains('ad-showing') || pl.classList.contains('ad-interrupting')));
-    if (!ad && !applied && v.readyState > 0) apply(v);
+    if (!ad && !applied && v.readyState > 0) { apply(v); if (pageInit.key) setKey(pageInit.key); }
     if (!ad && v.ended && !endedSent) { endedSent = true; ipcRenderer.send('ytpage:state', { ended: true }); return; }
     send({ t: ad ? 0 : v.currentTime, d: ad ? 0 : v.duration || 0, playing: !v.paused && !ad, ad,
       title: document.title.replace(/^\(\d+\)\s*/, '').replace(/\s+-\s+YouTube$/, '') });
@@ -140,6 +174,7 @@ if (pageInit) {
       case 'seek': if (v && isFinite(c.arg)) { v.currentTime = c.arg; endedSent = false; } break;
       case 'volume': pageInit.vol = +c.arg || 0; if (v) v.volume = Math.min(1, Math.max(0, pageInit.vol / 100)); break;
       case 'rate': pageInit.rate = +c.arg || 1; if (v) v.playbackRate = pageInit.rate; break;
+      case 'key': setKey(Math.max(-6, Math.min(6, Math.round(+c.arg || 0)))); break;
       case 'howl': {
         let el = document.getElementById('kamioke-howl');
         if (!el) { el = document.createElement('div'); el.id = 'kamioke-howl'; el.textContent = 'MOVE MICROPHONE AWAY FROM SPEAKERS'; document.documentElement.appendChild(el); }

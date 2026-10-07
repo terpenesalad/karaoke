@@ -48,6 +48,10 @@
       <div class="queue-head">
         <h2 id="queueHead">Up next</h2>
         <label class="singer"><span>Singer</span><input id="singerName" type="text" placeholder="Who’s singing?" autocomplete="off" maxlength="40"></label>
+        <div class="singer-picks">
+          <div id="singerChips" class="chips" role="group" aria-label="Saved singers" hidden></div>
+          <button type="button" class="ghost small" id="editSingers">Edit singers</button>
+        </div>
       </div>
       <ol id="queue" aria-label="Queue"></ol>
     </section>
@@ -190,6 +194,18 @@
     <button class="btn" id="lyExport">Download .lrc</button>
     <form method="dialog"><button class="btn">Close</button></form>
   </div>
+</dialog>
+
+<dialog id="dlgSingers" aria-labelledby="dlgSingersH">
+  <h2 id="dlgSingersH">Singers</h2>
+  <p class="hint">Change a name to rename it (anyone already in Up next is updated too), or delete it.</p>
+  <ul id="singerList" class="singer-list"></ul>
+  <form id="singerAddForm" class="field">
+    <label class="sr-only" for="singerAdd">Add a singer</label>
+    <input id="singerAdd" type="text" placeholder="Add a singer" maxlength="40" autocomplete="off">
+    <button class="btn">Add</button>
+  </form>
+  <form method="dialog"><button class="btn primary">Done</button></form>
 </dialog>
 
 <dialog id="dlgName" aria-labelledby="dlgNameH">

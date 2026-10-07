@@ -9,7 +9,7 @@ Kami-oke (formerly Back Room Karaoke) is karaoke for your living room. Sing over
 | Source | How | What works |
 | --- | --- | --- |
 | **Your own music and videos** | Drop files on the window, or **Add music files**. MP3, M4A, WAV, OGG, FLAC, MP4, WebM, MKV, MOV. | Everything: vocal remover, key change, tempo, synced lyrics, recording. |
-| **YouTube karaoke videos** | **Find on YouTube**, then click any video (desktop app), or paste a link. | Words are already on screen. Music fader and tempo apply. Ads are blocked in the desktop app. If an uploader blocks embedding, the desktop app plays that video on YouTube's own watch page inside the stage instead. |
+| **YouTube karaoke videos** | **Find on YouTube**, then click any video (desktop app), or paste a link. | Words are already on screen. Music fader and tempo apply. Ads are blocked in the desktop app. If an uploader blocks embedding, the desktop app plays that video on YouTube's own watch page inside the stage instead. **Key change** works on YouTube in the desktop app too (it switches the video to the watch page and shifts its audio live). |
 | **Built-in sing-alongs** | Listed under *Sing-alongs*. Public-domain songs with original arrangements. | Melody lane and an on-key score. |
 
 The app plays YouTube through YouTube's own player (embedded, or YouTube's watch page for videos that can't be embedded) and never downloads videos.
@@ -31,7 +31,7 @@ The app plays YouTube through YouTube's own player (embedded, or YouTube's watch
 
 ## Stage screen and parties
 
-**Stage screen** (`S`) opens a lyrics-only window. In the desktop app it goes full screen on your second display automatically. Type a singer's name, add songs to **Up next** with the + button, and the stage shows who's next between songs.
+**Stage screen** (`S`) opens a lyrics-only window. In the desktop app it goes full screen on your second display automatically. Type a singer's name, add songs to **Up next** with the + button, and the stage shows who's next between songs. Names are remembered: pick one with a click, or use **Edit singers** to rename or delete names (renaming updates anyone already queued).
 
 ## Accessibility
 
@@ -56,6 +56,7 @@ The app plays YouTube through YouTube's own player (embedded, or YouTube's watch
 
 - **Vocal remover**: cancels what's panned dead centre between 160 Hz and 9 kHz (adjustable), keeps centred bass and kick, and folds a delayed copy of the side signal back in so it still works on mono speakers.
 - **Key change**: an offline phase vocoder with identity phase locking and a windowed-sinc resampler, running in a Web Worker at about 45× real time. It shares one phase rotation across both channels, so the vocal remover still works after a key change.
+- **YouTube key change** (desktop): the watch page's audio runs through a real-time phase-vocoder pitch shifter (peak-locked, 4096-point frames, about 85 ms of delay) in an AudioWorklet inside that page.
 - **Feedback detection**: watches for a narrow, sustained tone with weak harmonics that holds or grows — which a sung note doesn't — then adds a tight notch filter.
 - **Desktop app**: Electron. Serves the app from a private `127.0.0.1` server that only streams files you've added (with seeking), grants only the microphone, shows YouTube's watch page over the stage for videos whose uploader blocks embedding, and blocks YouTube ads in three layers: network requests to ad servers, ad slots stripped from player data, and auto-skip for anything left.
 

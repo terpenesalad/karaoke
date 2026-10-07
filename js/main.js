@@ -10,6 +10,7 @@ import { YTPagePlayer } from './ytpage.js';
 import { Library, renderLibrary, renderQueue, isMedia, isLyricsFile, baseName } from './library.js';
 import { renderPane, setupTabs } from './panes.js';
 import { initLyricsEditor, openLyricsEditor } from './editor.js';
+import { Singers, renderSingerChips, renderSingerEditor } from './singers.js';
 
 const isStage = new URLSearchParams(location.search).has('stage');
 if (isStage) import('./stage.js').then(m => m.startStage());
@@ -55,6 +56,10 @@ function boot() {
   const ytp = host && host.ytPage ? new YTPagePlayer(host, stageEl, {
     onState: s => { if (ytMode() === 'page') { setPlayIcon(s.playing); if (s.ended) songEnded(); } },
     onTitle: t => ytTitle(t),
+    onKey: (ok, err) => {
+      if (ok) announce(`Key ${P.key > 0 ? 'up ' + P.key : P.key < 0 ? 'down ' + -P.key : 'back to the original'}`);
+      else toast(`Couldn’t change the key of this video${err ? ': ' + err : '.'}`, 6000);
+    },
     onBlocked: msg => { if (cur && blockedNoticeFor !== cur.id) { blockedNoticeFor = cur.id; toast(`YouTube won’t play this one here either: ${msg}`, 7000); } },
   }) : null;
   // Which YouTube player is driving the current song, if any.
@@ -151,7 +156,7 @@ function boot() {
     vid.playbackRate = audio.playbackRate;
   }
 
-  async function playSong(song, { singer = '', autoplay = true } = {}) {
+  async function playSong(song, { singer = '', autoplay = true, start = 0 } = {}) {
     if (!song) return;
     if (song.missing) { toast('That file has moved or been deleted. Remove it and add it again.', 5000); return; }
     engine.ensure();
@@ -161,6 +166,7 @@ function boot() {
     stopAll();
     cur = song;
     cur.singer = singer || $('#singerName').value.trim();
+    if (cur.singer) singers.use(cur.singer);
     P.key = store.get('brk2-key:' + song.id, 0);
     P.lyricOffset = store.get('brk2-offset:' + song.id, 0);
     $('#idle').hidden = true;
@@ -171,10 +177,12 @@ function boot() {
     if (song.kind === 'yt') {
       stageEl.classList.add('has-yt');
       lyricsView.setLines([]); curLyrics = [];
+      // A key change on YouTube needs the watch-page player (its audio can be shifted).
+      if (P.key && ytp && !song.ytPage) { song.ytPage = true; lib.changed(); }
       if (song.ytPage && ytp) {
         const where = stage.connected ? 'stage' : 'main';
         $('#yt').hidden = true; $('#ytRemote').hidden = where !== 'stage';
-        await ytp.load(song.ytId, { vol: P.musicVol, rate: P.speed / 100, where });
+        await ytp.load(song.ytId, { start, vol: P.musicVol, rate: P.speed / 100, key: P.key, where });
       } else if (stage.connected) {
         stage.ytRemote = true; stage.ytTime = 0; stage.ytDur = 0;
         $('#ytRemote').hidden = false; $('#yt').hidden = true;
@@ -360,8 +368,20 @@ function boot() {
   }
   function setKey(v) {
     if (!cur) { toast('Pick a song first'); return; }
-    if (cur.kind === 'yt') { toast('Key change works on your own files and the sing-alongs, not YouTube videos.'); return; }
+    if (cur.kind === 'yt' && !ytp) { toast('Changing the key of YouTube videos needs the Kami-oke desktop app.', 5000); return; }
     P.key = clamp(Math.round(v), -6, 6);
+    if (cur.kind === 'yt') {
+      store.set('brk2-key:' + cur.id, P.key);
+      setNow();
+      if (currentTab() === 'mix') renderPane(app, 'mix');
+      if (cur.ytPage) { ytp.setKey(P.key); return; }
+      // Move this song to YouTube's watch page, where its audio can be shifted, and carry on from here.
+      const song = cur, t = now();
+      song.ytPage = true; lib.changed();
+      toast('Changing the key: switching this video to YouTube’s own page so its audio can be shifted.', 5000);
+      playSong(song, { singer: song.singer, start: t });
+      return;
+    }
     if (currentTab() === 'mix') renderPane(app, 'mix');
     clearTimeout(setKey.t);
     setKey.t = setTimeout(() => applyKey(), 350); // let rapid presses settle
@@ -524,6 +544,7 @@ function boot() {
     queue: s => {
       const singer = $('#singerName').value.trim();
       lib.enqueue(s.id, singer);
+      if (singer) singers.use(singer);
       toast(`Added ${s.title} to up next${singer ? ' for ' + singer : ''}`);
     },
     lyrics: s => openLyricsEditor(app, s),
@@ -541,8 +562,48 @@ function boot() {
   $('#libFilter').addEventListener('input', refreshLists);
   refreshLists();
   lib.reconnect();
-  $('#singerName').value = store.get('brk2-singer', '');
-  $('#singerName').addEventListener('change', e => store.set('brk2-singer', e.target.value.trim()));
+  /* ---- singers: remembered names, quick picks, rename/delete */
+  const singers = new Singers();
+  const singerBox = $('#singerName');
+  const refreshSingers = () => {
+    renderSingerChips(singers, $('#singerChips'), singerBox.value.trim(), pickSinger);
+    $('#editSingers').hidden = !singers.names.length;
+    if ($('#dlgSingers').open) renderSingerEditor(singers, $('#singerList'), { onRename: renameSinger, onRemove: removeSinger });
+  };
+  function pickSinger(n) {
+    singerBox.value = n; store.set('brk2-singer', n);
+    refreshSingers();
+    announce(n ? `Singer: ${n}` : 'Singer cleared');
+  }
+  function renameSinger(oldName, newName) {
+    const n = singers.rename(oldName, newName);
+    if (!n) return;
+    let changed = false;
+    for (const q of lib.queue) if (q.singer === oldName) { q.singer = n; changed = true; }
+    if (changed) lib.changed();
+    if (singerBox.value.trim() === oldName) { singerBox.value = n; store.set('brk2-singer', n); }
+    if (cur && cur.singer === oldName) { cur.singer = n; setNow(); }
+    refreshSingers();
+    announce(`Renamed ${oldName} to ${n}`);
+  }
+  function removeSinger(n) {
+    singers.remove(n);
+    if (singerBox.value.trim() === n) { singerBox.value = ''; store.set('brk2-singer', ''); }
+    refreshSingers();
+    announce(`Deleted ${n}`);
+    $('#singerList input')?.focus();
+  }
+  singers.onChange(refreshSingers);
+  singerBox.value = store.get('brk2-singer', '');
+  singerBox.addEventListener('input', refreshSingers);
+  singerBox.addEventListener('change', e => { const v = e.target.value.trim(); store.set('brk2-singer', v); if (v) singers.use(v); });
+  $('#editSingers').onclick = () => { $('#dlgSingers').showModal(); refreshSingers(); $('#singerAdd').focus(); };
+  $('#singerAddForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('#singerAdd').value.trim();
+    if (v) { singers.use(v); $('#singerAdd').value = ''; announce(`Added ${v}`); }
+  });
+  refreshSingers();
 
   /* ---- adding files */
   async function addFiles(files) {

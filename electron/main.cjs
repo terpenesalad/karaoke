@@ -219,6 +219,18 @@ const videoId = u => { const m = /youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/)([
 // inside the app, over the stage area (or filling the stage screen), trimmed down to just the
 // picture and driven by the app's own controls. Nothing is downloaded.
 const ytPage = { view: null, host: null, init: null, onResize: null };
+// The live key-change shifter that runs inside the watch page (see ytpitch-worklet.js).
+const PITCH_SRC = fs.readFileSync(path.join(__dirname, 'ytpitch-worklet.js'), 'utf8');
+// YouTube's page security policy would stop us loading that shifter, so lift it for our own
+// player view only (never the search window or anything else).
+function allowShifterIn(ses) {
+  ses.webRequest.onHeadersReceived((d, cb) => {
+    if (!ytPage.view || d.webContentsId !== ytPage.view.webContents.id || d.resourceType !== 'mainFrame') return cb({});
+    const headers = {};
+    for (const [k, v] of Object.entries(d.responseHeaders || {})) if (k.toLowerCase() !== 'content-security-policy') headers[k] = v;
+    cb({ responseHeaders: headers });
+  });
+}
 const stageWindow = () => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w !== mainWin && w.webContents.getURL().includes('stage=1'));
 function ytPageAttach(which) {
   const v = ytPage.view;
@@ -253,7 +265,7 @@ ipcMain.handle('ytpage:open', (e, o = {}) => {
   });
   v.setBackgroundColor('#000000');
   ytPage.view = v;
-  ytPage.init = { id: o.id, at: Math.max(0, +o.at || 0), vol: Math.min(100, Math.max(0, +o.vol || 0)), rate: +o.rate || 1, ended: false };
+  ytPage.init = { id: o.id, at: Math.max(0, +o.at || 0), vol: Math.min(100, Math.max(0, +o.vol || 0)), rate: +o.rate || 1, key: Math.max(-6, Math.min(6, Math.round(+o.key || 0))), pitchSrc: PITCH_SRC, debug: !!process.env.KAMIOKE_TEST_WATCH_URL, ended: false };
   const wc = v.webContents;
   wc.setWindowOpenHandler(() => ({ action: 'deny' }));
   const otherVideo = u => { const m = /[?&]v=([\w-]{11})/.exec(u || ''); return !m || m[1] !== ytPage.init.id; };
@@ -283,6 +295,7 @@ ipcMain.on('ytpage:init', e => { e.returnValue = ytPage.view && e.sender === ytP
 ipcMain.on('ytpage:state', (e, st) => {
   if (!ytPage.view || e.sender !== ytPage.view.webContents || !st) return;
   if (st.ended) return ytPageEnded();
+  if (st.keyOk || st.keyFailed) { mainWin && mainWin.webContents.send('ytpage:state', { keyOk: !!st.keyOk, keyFailed: st.keyFailed ? String(st.keyFailed).slice(0, 200) : null }); return; }
   mainWin && mainWin.webContents.send('ytpage:state', {
     t: +st.t || 0, d: +st.d || 0, playing: !!st.playing, ad: !!st.ad, title: String(st.title || '').slice(0, 200), blocked: st.blocked ? String(st.blocked).slice(0, 200) : null,
   });
@@ -363,6 +376,7 @@ else {
     ORIGIN = `http://127.0.0.1:${port}`;
     const yts = session.fromPartition('persist:youtube');
     for (const ses of [session.defaultSession, yts]) installAdBlock(ses);
+    allowShifterIn(yts);
     appOnly(session.defaultSession);
     yts.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'fullscreen'));
     createWindow();
