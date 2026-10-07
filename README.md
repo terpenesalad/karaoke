@@ -68,7 +68,7 @@ npm test         # unit tests
 npm run dist     # Windows installer + portable exe in dist/
 ```
 
-Pushing a tag like `v2.0.1` builds both `.exe` files on GitHub Actions and attaches them to a release. The web version needs no build: serve the folder (`python -m http.server`) and open `index.html`.
+Bump `version` in `package.json` and push to `main`: GitHub Actions tests, builds both `.exe` files on Windows and publishes a release for that version (pushing a `v*` tag works too). The web version needs no build: serve the folder (`python -m http.server`) and open `index.html`.
 
 ## Credits
 
