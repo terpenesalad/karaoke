@@ -89,16 +89,23 @@ if (isYouTube) {
 let pageInit = null;
 if (!isApp && window === window.top) { try { pageInit = ipcRenderer.sendSync('ytpage:init'); } catch {} }
 if (pageInit) {
+  // Trimming only applies once the player exists (html.kamioke-ready), so pages without one,
+  // like a cookie-consent screen, still show normally and can be clicked through.
   webFrame.insertCSS(`
-    html, body { overflow: hidden !important; background: #000 !important; }
-    #masthead-container, #secondary, #below, #comments, ytd-mealbar-promo-renderer, tp-yt-paper-dialog, ytd-popup-container,
-    .ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, .ytp-gradient-bottom, .ytp-ce-element, .ytp-pause-overlay,
-    .ytp-endscreen-content, .ytp-cards-teaser, .ytp-paid-content-overlay, .ytp-autonav-endscreen, .iv-branding, .ytp-watermark,
-    .ytp-suggested-action, .ytp-contextmenu { display: none !important; }
-    #movie_player, #player-full-bleed-container, #full-bleed-container {
+    html.kamioke-ready, html.kamioke-ready body { overflow: hidden !important; background: #000 !important; }
+    /* Hide everything except the player. Visibility (not display) can't cover the player and
+       doesn't depend on YouTube's container names; the player opts back in below. */
+    html.kamioke-ready body *:not(#movie_player, #movie_player *, #kamioke-howl) { visibility: hidden !important; }
+    html.kamioke-ready #movie_player {
+      visibility: visible !important;
       position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important;
-      max-height: none !important; z-index: 2147483000 !important; background: #000 !important; }
-    #movie_player video { width: 100% !important; height: 100% !important; left: 0 !important; top: 0 !important; object-fit: contain !important; }
+      max-width: none !important; max-height: none !important; margin: 0 !important;
+      z-index: 2147483000 !important; background: #000 !important; }
+    html.kamioke-ready #movie_player .html5-video-container { width: 100% !important; height: 100% !important; }
+    html.kamioke-ready #movie_player video { width: 100% !important; height: 100% !important; left: 0 !important; top: 0 !important; object-fit: contain !important; }
+    html.kamioke-ready :is(.ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, .ytp-gradient-bottom, .ytp-ce-element,
+      .ytp-pause-overlay, .ytp-endscreen-content, .ytp-cards-teaser, .ytp-paid-content-overlay, .ytp-autonav-endscreen,
+      .iv-branding, .ytp-watermark, .ytp-suggested-action, .ytp-contextmenu, .ytp-player-content) { display: none !important; }
     #kamioke-howl { position: fixed; right: 2.4vw; bottom: 2.4vw; z-index: 2147483647; pointer-events: none;
       font: 800 clamp(15px, 2.3vw, 26px)/1.15 system-ui, sans-serif; letter-spacing: .06em; color: #fff;
       text-shadow: 0 1px 12px rgba(0,0,0,.8); display: flex; align-items: center; gap: .6em; opacity: 0; transition: opacity .6s; }
@@ -149,13 +156,26 @@ if (pageInit) {
     if (pageInit.rate) v.playbackRate = pageInit.rate;
     applied = true;
   };
+  // A pinned (position: fixed) player is trapped by any wrapper with a transform, filter or
+  // containment; YouTube uses those, so neutralise them on the player's ancestors.
+  const FREE = { transform: 'none', filter: 'none', perspective: 'none', contain: 'none', 'will-change': 'auto', 'backdrop-filter': 'none' };
+  let lastSize = '';
+  function fitPlayer(pl) {
+    document.documentElement.classList.add('kamioke-ready');
+    for (let el = pl.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      for (const [k, v] of Object.entries(FREE)) if (el.style.getPropertyValue(k) !== v) el.style.setProperty(k, v, 'important');
+    }
+    // Let YouTube's player re-measure itself when its size changes.
+    const r = pl.getBoundingClientRect(), size = `${Math.round(r.width)}x${Math.round(r.height)}|${innerWidth}x${innerHeight}`;
+    if (size !== lastSize) { lastSize = size; window.dispatchEvent(new Event('resize')); }
+  }
   setInterval(() => {
     const v = video(), pl = player();
+    if (pl) fitPlayer(pl);
     // Some videos still can't play here (age checks, region locks); pass YouTube's own message on.
     const err = document.querySelector('.ytp-error-content-wrap-reason, yt-playability-error-supported-renderers #reason');
     if (err && err.textContent.trim()) { send({ blocked: err.textContent.trim() }); return; }
     if (!v) return;
-    window.dispatchEvent(new Event('resize'));
     const ad = !!(pl && (pl.classList.contains('ad-showing') || pl.classList.contains('ad-interrupting')));
     if (!ad && !applied && v.readyState > 0) { apply(v); if (pageInit.key) setKey(pageInit.key); }
     if (!ad && v.ended && !endedSent) { endedSent = true; ipcRenderer.send('ytpage:state', { ended: true }); return; }
