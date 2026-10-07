@@ -61,5 +61,5 @@ jobs:
               echo "Release $TAG already exists. Bump the version in package.json to publish a new one."
             fi
           else
-            gh release create "$TAG" dist/*.exe --target "$GITHUB_SHA" --title "Back Room Karaoke ${TAG#v}" --notes-file .github/release-notes.md
+            gh release create "$TAG" dist/*.exe --target "$GITHUB_SHA" --title "Kami-oke ${TAG#v}" --notes-file .github/release-notes.md
           fi

@@ -67,7 +67,7 @@ export class YTPlayer {
         },
         onError: e => {
           const why = { 2: 'That link isn’t a valid video.', 5: 'That video can’t play here.', 100: 'That video was removed or made private.', 101: 'The uploader doesn’t allow this video to play outside YouTube. Try another version.', 150: 'The uploader doesn’t allow this video to play outside YouTube. Try another version.', 153: 'YouTube refused to play the video here. Try another version.' }[e.data];
-          this.ev.onError?.(why || 'YouTube couldn’t play that video.');
+          this.ev.onError?.(why || 'YouTube couldn’t play that video.', e.data);
         },
       },
     });

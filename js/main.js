@@ -6,6 +6,7 @@ import { LyricsView, PitchLane } from './lyrics-view.js';
 import { yin, hzToMidi, noteName, HowlDetector, Scorer } from './pitch.js';
 import { DEMOS, layout, renderDemo, toWav } from './demos.js';
 import { YTPlayer, parseYouTube } from './youtube.js';
+import { YTPagePlayer } from './ytpage.js';
 import { Library, renderLibrary, renderQueue, isMedia, isLyricsFile, baseName } from './library.js';
 import { renderPane, setupTabs } from './panes.js';
 import { initLyricsEditor, openLyricsEditor } from './editor.js';
@@ -31,9 +32,9 @@ function boot() {
   });
   const lane = new PitchLane($('#lane'));
   const yt = new YTPlayer($('#yt'), {
-    onState: s => { if (cur && cur.kind === 'yt' && !stage.ytRemote) { setPlayIcon(s.playing); if (s.ended) songEnded(); } },
+    onState: s => { if (ytMode() === 'local') { setPlayIcon(s.playing); if (s.ended) songEnded(); } },
     onTitle: t => ytTitle(t),
-    onError: msg => toast(msg, 5000),
+    onError: (msg, code) => ytFailed(msg, code),
   });
 
   const app = {
@@ -49,6 +50,15 @@ function boot() {
     connected: false, win: null, ytRemote: false, ytTime: 0, ytDur: 0, ytPlaying: false,
     send: m => chan && chan.postMessage(m),
   };
+  // Desktop only: YouTube's own watch page, for uploads that block the embedded player.
+  let blockedNoticeFor = null;
+  const ytp = host && host.ytPage ? new YTPagePlayer(host, stageEl, {
+    onState: s => { if (ytMode() === 'page') { setPlayIcon(s.playing); if (s.ended) songEnded(); } },
+    onTitle: t => ytTitle(t),
+    onBlocked: msg => { if (cur && blockedNoticeFor !== cur.id) { blockedNoticeFor = cur.id; toast(`YouTube won’t play this one here either: ${msg}`, 7000); } },
+  }) : null;
+  // Which YouTube player is driving the current song, if any.
+  const ytMode = () => !isYT() ? null : (cur.ytPage && ytp) ? 'page' : stage.ytRemote ? 'remote' : 'local';
   let cur = null;            // current song
   let curLyrics = [];        // parsed lines
   let curNotes = [];         // melody notes (sing-alongs)
@@ -84,7 +94,7 @@ function boot() {
       if (id === 'musicVol') setYTVolume();
     });
   }
-  const setYTVolume = () => { yt.setVolume(P.musicVol); if (stage.ytRemote) stage.send({ type: 'yt', cmd: 'volume', arg: P.musicVol }); };
+  const setYTVolume = () => { yt.setVolume(P.musicVol); if (ytp) ytp.setVolume(P.musicVol); if (stage.ytRemote) stage.send({ type: 'yt', cmd: 'volume', arg: P.musicVol }); };
   setYTVolume();
 
   async function startMic() {
@@ -118,9 +128,9 @@ function boot() {
 
   /* ------------------------------------------------------------------ playback */
   const isYT = () => cur && cur.kind === 'yt';
-  const now = () => isYT() ? (stage.ytRemote ? stage.ytTime : yt.time) : audio.currentTime;
-  const duration = () => isYT() ? (stage.ytRemote ? stage.ytDur : yt.duration) : (isFinite(audio.duration) ? audio.duration : 0);
-  const playing = () => isYT() ? (stage.ytRemote ? stage.ytPlaying : yt.playing) : !audio.paused;
+  const now = () => ({ page: () => ytp.time, remote: () => stage.ytTime, local: () => yt.time })[ytMode()]?.() ?? audio.currentTime;
+  const duration = () => ({ page: () => ytp.duration, remote: () => stage.ytDur, local: () => yt.duration })[ytMode()]?.() ?? (isFinite(audio.duration) ? audio.duration : 0);
+  const playing = () => ({ page: () => ytp.playing, remote: () => stage.ytPlaying, local: () => yt.playing })[ytMode()]?.() ?? !audio.paused;
 
   function setPlayIcon(on) {
     $('#playPath').setAttribute('d', on ? 'M7 5h4v14H7zM13 5h4v14h-4z' : 'M8 5v14l11-7z');
@@ -161,7 +171,11 @@ function boot() {
     if (song.kind === 'yt') {
       stageEl.classList.add('has-yt');
       lyricsView.setLines([]); curLyrics = [];
-      if (stage.connected) {
+      if (song.ytPage && ytp) {
+        const where = stage.connected ? 'stage' : 'main';
+        $('#yt').hidden = true; $('#ytRemote').hidden = where !== 'stage';
+        await ytp.load(song.ytId, { vol: P.musicVol, rate: P.speed / 100, where });
+      } else if (stage.connected) {
         stage.ytRemote = true; stage.ytTime = 0; stage.ytDur = 0;
         $('#ytRemote').hidden = false; $('#yt').hidden = true;
         stage.send({ type: 'yt', cmd: 'load', arg: song.ytId, vol: P.musicVol, rate: P.speed / 100 });
@@ -199,13 +213,14 @@ function boot() {
     if (cur && cur.artist) bits.push(cur.artist);
     if (cur && P.key) bits.push(`Key ${P.key > 0 ? '+' : ''}${P.key}`);
     $('#nowSub').textContent = bits.join(' — ');
-    document.title = cur ? `${cur.title} — Back Room Karaoke` : 'Back Room Karaoke';
+    document.title = cur ? `${cur.title} — Kami-oke` : 'Kami-oke';
   }
 
   function stopAll() {
     audio.pause();
     vid.pause(); vid.removeAttribute('src'); vid.load();
     yt.stop();
+    if (ytp) ytp.stop();
     if (stage.ytRemote) { stage.send({ type: 'yt', cmd: 'stop' }); stage.ytRemote = false; }
   }
 
@@ -228,7 +243,10 @@ function boot() {
     audio.playbackRate = P.speed / 100;
     audio.preservesPitch = true;
     vid.playbackRate = P.speed / 100;
-    if (isYT()) { if (stage.ytRemote) stage.send({ type: 'yt', cmd: 'rate', arg: P.speed / 100 }); else yt.setRate(P.speed / 100); }
+    const m = ytMode();
+    if (m === 'page') ytp.setRate(P.speed / 100);
+    else if (m === 'remote') stage.send({ type: 'yt', cmd: 'rate', arg: P.speed / 100 });
+    else if (m === 'local') yt.setRate(P.speed / 100);
   }
   app.applyRate = applyRate;
 
@@ -415,7 +433,9 @@ function boot() {
       return toast('Pick a song from the list first');
     }
     if (isYT()) {
-      if (stage.ytRemote) stage.send({ type: 'yt', cmd: stage.ytPlaying ? 'pause' : 'play' });
+      const m = ytMode();
+      if (m === 'page') ytp.playing ? ytp.pause() : ytp.play();
+      else if (m === 'remote') stage.send({ type: 'yt', cmd: stage.ytPlaying ? 'pause' : 'play' });
       else (yt.playing ? yt.pause() : yt.play());
       return;
     }
@@ -423,7 +443,7 @@ function boot() {
   }
   function seekTo(t) {
     t = clamp(t, 0, duration() || 0);
-    if (isYT()) { stage.ytRemote ? stage.send({ type: 'yt', cmd: 'seek', arg: t }) : yt.seek(t); return; }
+    if (isYT()) { const m = ytMode(); if (m === 'page') ytp.seek(t); else if (m === 'remote') stage.send({ type: 'yt', cmd: 'seek', arg: t }); else yt.seek(t); return; }
     try { audio.currentTime = t; } catch {}
   }
   $('#play').onclick = togglePlay;
@@ -440,7 +460,7 @@ function boot() {
 
   function songEnded() {
     setPlayIcon(false);
-    if (isYT()) { if (stage.ytRemote) stage.send({ type: 'yt', cmd: 'stop' }); else yt.stop(); }
+    if (isYT()) { const m = ytMode(); if (m === 'page') ytp.stop(); else if (m === 'remote') stage.send({ type: 'yt', cmd: 'stop' }); else yt.stop(); }
     if (scorer && scorer.total > 5) toast(`Nice! You were on key ${scorer.percent}% of the time.`, 6000);
     if (cur) history.push(cur);
     if (lib.queue.length) showUpNext();
@@ -611,6 +631,20 @@ function boot() {
     toast(`Added ${s.title}`);
     announce(`Added ${s.title} to your songs`);
   });
+  // Some uploaders block the embedded player. In the desktop app those play on YouTube's own
+  // watch page instead; remember that per song so it goes straight there next time.
+  const EMBED_BLOCKED = [101, 150, 153];
+  function ytFailed(msg, code) {
+    if (!cur || cur.kind !== 'yt') { toast(msg, 5000); return; }
+    if (EMBED_BLOCKED.includes(code) && ytp && !cur.ytPage) {
+      cur.ytPage = true; lib.changed();
+      toast('This uploader blocks embedded playback, so it’s playing on YouTube’s own page instead.', 6000);
+      playSong(cur, { singer: cur.singer });
+      return;
+    }
+    if (EMBED_BLOCKED.includes(code) && !host) { toast('The uploader only allows this video on YouTube. The Kami-oke desktop app can still play it.', 7000); return; }
+    toast(msg, 5000);
+  }
   function ytTitle(t) {
     if (!cur || cur.kind !== 'yt' || !t) return;
     if (cur.title === 'YouTube video' || cur.needsTitle) {
@@ -644,7 +678,8 @@ function boot() {
     if (m.type === 'hello') {
       stage.connected = true; $('#stageBtn').setAttribute('aria-pressed', 'true');
       broadcastSettings(); broadcastSong();
-      if (isYT()) { // hand YouTube over to the big screen
+      if (ytMode() === 'page') { ytp.moveTo('stage'); $('#ytRemote').hidden = false; }
+      else if (isYT()) { // hand YouTube over to the big screen
         const t = yt.time; yt.stop(); $('#yt').hidden = true; $('#ytRemote').hidden = false;
         stage.ytRemote = true;
         stage.send({ type: 'yt', cmd: 'load', arg: cur.ytId, at: t, vol: P.musicVol, rate: P.speed / 100 });
@@ -657,13 +692,14 @@ function boot() {
       if (stage.ytPlaying !== m.playing) { stage.ytPlaying = m.playing; setPlayIcon(m.playing); }
       if (m.title) ytTitle(m.title);
       if (m.ended) songEnded();
-    } else if (m.type === 'yt-error') toast(m.message, 5000);
+    } else if (m.type === 'yt-error') ytFailed(m.message, m.code);
   };
   function stageGone() {
     if (!stage.connected) return;
     stage.connected = false; stage.win = null;
     $('#stageBtn').setAttribute('aria-pressed', 'false');
-    if (stage.ytRemote && isYT()) {
+    if (ytMode() === 'page') { ytp.moveTo('main'); $('#ytRemote').hidden = true; }
+    else if (stage.ytRemote && isYT()) {
       stage.ytRemote = false; $('#ytRemote').hidden = true; $('#yt').hidden = false;
       yt.load(cur.ytId, { autoplay: stage.ytPlaying, start: stage.ytTime });
     }
@@ -818,6 +854,7 @@ function boot() {
     $('#howl').setAttribute('aria-hidden', String(!on));
     if (on) announce('Feedback! Move the microphone away from the speakers.', true);
     broadcast({ type: 'howl', on });
+    if (ytp) ytp.howl(on);
   }
 
   /* ------------------------------------------------------------------ panes + tabs */
@@ -872,5 +909,5 @@ function boot() {
   app.nudgeOffset = nudgeOffset;
 
   // Debug/test hook.
-  window.__karaoke = { app, playSong, lib, engine, stage, get cur() { return cur; }, get lines() { return curLyrics; }, setHowl };
+  window.__karaoke = { app, playSong, lib, engine, stage, ytp, ytFailed, get cur() { return cur; }, get lines() { return curLyrics; }, setHowl };
 }

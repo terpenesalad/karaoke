@@ -1,9 +1,11 @@
-**Download one:** `Back-Room-Karaoke-Setup-…exe` installs with shortcuts; `Back-Room-Karaoke-…-Portable.exe` runs without installing. If Windows says "Windows protected your PC", choose **More info → Run anyway** (the app isn't code-signed).
+**Back Room Karaoke is now Kami-oke.** Your songs, lyrics and settings carry over.
 
-### 2.0.1
-- **Up next card is simpler**: the next singer's name, big, with the song title underneath and a slim countdown.
-- **A proper break between songs**: 20 seconds by default, adjustable from 5 to 90 in Settings → Queue. **Hold** pauses the countdown; **Start now** skips it.
-- **Clean YouTube titles**: songs added from the YouTube window use YouTube's own title instead of picking up text from the preview player. Titles saved by 2.0.0 are tidied automatically and corrected the next time they play.
-- YouTube's end screen is cleared when a song finishes.
+**Download one:** `Kami-oke-Setup-2.1.0.exe` installs with shortcuts (it should replace Back Room Karaoke; if both show up in Start, uninstall the old one from Settings → Apps). `Kami-oke-2.1.0-Portable.exe` runs without installing. If Windows says "Windows protected your PC", choose **More info → Run anyway** (the app isn't code-signed).
 
-See the [2.0.0 notes](https://github.com/terpenesalad/karaoke/releases/tag/v2.0.0) for everything else.
+### 2.1.0
+- **New name: Kami-oke.**
+- **YouTube videos that block embedding now play.** Some uploaders only allow their videos on YouTube itself. When a video refuses to play in the app, Kami-oke switches to YouTube's own watch page, shown in the stage area and trimmed to just the picture. Your play, pause, seek, Music fader, tempo and stage screen all still work, and it remembers the song so it goes straight there next time. Desktop app only.
+- The feedback warning also appears on top of those videos.
+- The first colour theme is now called *Night*.
+
+Age-restricted or region-locked videos may still not play; Kami-oke shows YouTube's reason when that happens. Signing in to YouTube in the **Find on YouTube** window can help with age checks.

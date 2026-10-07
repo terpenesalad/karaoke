@@ -1,9 +1,9 @@
-// Back Room Karaoke — desktop shell.
+// Kami-oke — desktop shell.
 // Serves the web app from a private localhost server (stable origin, so settings persist and
 // YouTube embeds work), streams your own media files by path with seeking support, grants the
 // microphone, opens the YouTube search window and blocks YouTube ads.
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, session, screen, shell, Menu, net } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, session, screen, shell, Menu, net } = require('electron');
 const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -12,6 +12,13 @@ const crypto = require('node:crypto');
 const { AD_URL_PATTERNS, COSMETIC_CSS } = require('./adblock.cjs');
 
 const ROOT = path.join(__dirname, '..');
+
+// The app used to be called Back Room Karaoke. Keep using its data folder (songs, lyrics,
+// settings) so nothing is lost after the rename.
+try {
+  const legacy = path.join(app.getPath('appData'), 'Back Room Karaoke');
+  if (fs.existsSync(legacy)) app.setPath('userData', legacy);
+} catch {}
 const PORT_BASE = 47823;
 const MEDIA_EXT = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|wma|mp4|m4v|webm|mkv|mov|ogv)$/i;
 const MIME = {
@@ -206,6 +213,81 @@ function openYouTube(q) {
 }
 const videoId = u => { const m = /youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/)([\w-]{11})/.exec(u || ''); return m && m[1]; };
 
+/* ------------------------------------------------------------------ YouTube page player */
+// Some uploaders switch off embedding, which blocks YouTube's embedded player on other sites.
+// Those videos still play on YouTube's own watch page, so for them we show the real watch page
+// inside the app, over the stage area (or filling the stage screen), trimmed down to just the
+// picture and driven by the app's own controls. Nothing is downloaded.
+const ytPage = { view: null, host: null, init: null, onResize: null };
+const stageWindow = () => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w !== mainWin && w.webContents.getURL().includes('stage=1'));
+function ytPageAttach(which) {
+  const v = ytPage.view;
+  if (!v) return;
+  const next = which === 'stage' ? (stageWindow() || mainWin) : mainWin;
+  if (ytPage.host && ytPage.host !== next && !ytPage.host.isDestroyed()) {
+    ytPage.host.contentView.removeChildView(v);
+    if (ytPage.onResize) ytPage.host.off('resize', ytPage.onResize);
+  }
+  ytPage.host = next;
+  next.contentView.addChildView(v);
+  ytPage.onResize = null;
+  if (next !== mainWin) {
+    // On the stage screen the video fills the whole window.
+    ytPage.onResize = () => { const [w, h] = next.getContentSize(); v.setBounds({ x: 0, y: 0, width: w, height: h }); };
+    next.on('resize', ytPage.onResize); ytPage.onResize();
+  }
+}
+function ytPageClose() {
+  const v = ytPage.view;
+  if (!v) return;
+  ytPage.view = null;
+  try { if (ytPage.host && !ytPage.host.isDestroyed()) { ytPage.host.contentView.removeChildView(v); if (ytPage.onResize) ytPage.host.off('resize', ytPage.onResize); } } catch {}
+  ytPage.host = null;
+  try { v.webContents.close(); } catch {}
+}
+ipcMain.handle('ytpage:open', (e, o = {}) => {
+  if (!fromApp(e) || !/^[\w-]{11}$/.test(o.id || '')) return false;
+  ytPageClose();
+  const v = new WebContentsView({
+    webPreferences: { partition: 'persist:youtube', preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
+  });
+  v.setBackgroundColor('#000000');
+  ytPage.view = v;
+  ytPage.init = { id: o.id, at: Math.max(0, +o.at || 0), vol: Math.min(100, Math.max(0, +o.vol || 0)), rate: +o.rate || 1, ended: false };
+  const wc = v.webContents;
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const otherVideo = u => { const m = /[?&]v=([\w-]{11})/.exec(u || ''); return !m || m[1] !== ytPage.init.id; };
+  // Stay on this one video: if YouTube tries to move on (autoplay, end screen), treat it as the end.
+  wc.on('will-navigate', (ev, u) => { if (otherVideo(u)) { ev.preventDefault(); ytPageEnded(); } });
+  wc.on('did-navigate-in-page', (ev, u) => { if (otherVideo(u)) { wc.stop(); ytPageEnded(); } });
+  ytPageAttach(o.host);
+  if (o.bounds) v.setBounds(roundBounds(o.bounds));
+  // KAMIOKE_TEST_WATCH_URL lets the automated tests point this at a local mock page.
+  const base = process.env.KAMIOKE_TEST_WATCH_URL || 'https://www.youtube.com/watch';
+  wc.loadURL(`${base}?v=${o.id}${ytPage.init.at > 1 ? `&t=${Math.floor(ytPage.init.at)}s` : ''}`);
+  return true;
+});
+function ytPageEnded() {
+  if (!ytPage.init || ytPage.init.ended) return;
+  ytPage.init.ended = true;
+  mainWin && mainWin.webContents.send('ytpage:state', { ended: true, playing: false });
+}
+const roundBounds = b => ({ x: Math.round(b.x), y: Math.round(b.y), width: Math.max(0, Math.round(b.width)), height: Math.max(0, Math.round(b.height)) });
+ipcMain.on('ytpage:bounds', (e, b) => { if (fromApp(e) && ytPage.view && ytPage.host === mainWin && b) ytPage.view.setBounds(roundBounds(b)); });
+ipcMain.on('ytpage:visible', (e, on) => { if (fromApp(e) && ytPage.view) ytPage.view.setVisible(!!on); });
+ipcMain.on('ytpage:host', (e, which) => { if (fromApp(e)) ytPageAttach(which); });
+ipcMain.on('ytpage:close', e => { if (fromApp(e)) ytPageClose(); });
+ipcMain.on('ytpage:cmd', (e, c) => { if (fromApp(e) && ytPage.view) ytPage.view.webContents.send('ytpage:cmd', c); });
+// From the watch page itself.
+ipcMain.on('ytpage:init', e => { e.returnValue = ytPage.view && e.sender === ytPage.view.webContents ? ytPage.init : null; });
+ipcMain.on('ytpage:state', (e, st) => {
+  if (!ytPage.view || e.sender !== ytPage.view.webContents || !st) return;
+  if (st.ended) return ytPageEnded();
+  mainWin && mainWin.webContents.send('ytpage:state', {
+    t: +st.t || 0, d: +st.d || 0, playing: !!st.playing, ad: !!st.ad, title: String(st.title || '').slice(0, 200), blocked: st.blocked ? String(st.blocked).slice(0, 200) : null,
+  });
+});
+
 /* ------------------------------------------------------------------ ad blocking */
 function installAdBlock(ses) {
   ses.webRequest.onBeforeRequest({ urls: AD_URL_PATTERNS }, (d, cb) => cb({ cancel: !!prefs.adBlock }));
@@ -234,7 +316,7 @@ function stageBounds() {
 function createWindow() {
   mainWin = new BrowserWindow({
     width: 1440, height: 900, minWidth: 720, minHeight: 540, show: false,
-    backgroundColor: '#1c1222', title: 'Back Room Karaoke', autoHideMenuBar: true,
+    backgroundColor: '#1c1222', title: 'Kami-oke', autoHideMenuBar: true,
     icon: path.join(ROOT, 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
@@ -250,7 +332,7 @@ function createWindow() {
         action: 'allow',
         overrideBrowserWindowOptions: {
           x: b.x, y: b.y, width: b.width, height: b.height, fullscreen: b.fullscreen,
-          backgroundColor: '#000000', autoHideMenuBar: true, title: 'Back Room Karaoke — Stage',
+          backgroundColor: '#000000', autoHideMenuBar: true, title: 'Kami-oke — Stage',
           icon: path.join(ROOT, 'build', 'icon.png'),
           webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegrationInSubFrames: true, backgroundThrottling: false },
         },
@@ -267,7 +349,7 @@ function createWindow() {
     if (input.key === 'F11') { mainWin.setFullScreen(!mainWin.isFullScreen()); e.preventDefault(); }
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) { mainWin.webContents.toggleDevTools(); e.preventDefault(); }
   });
-  mainWin.on('closed', () => { mainWin = null; if (ytWin && !ytWin.isDestroyed()) ytWin.close(); });
+  mainWin.on('closed', () => { ytPageClose(); mainWin = null; if (ytWin && !ytWin.isDestroyed()) ytWin.close(); });
   mainWin.loadURL(ORIGIN + '/index.html');
 }
 

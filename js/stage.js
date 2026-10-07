@@ -6,7 +6,7 @@ import { LyricsView, PitchLane } from './lyrics-view.js';
 import { YTPlayer } from './youtube.js';
 
 export function startStage() {
-  document.title = 'Back Room Karaoke — Stage';
+  document.title = 'Kami-oke — Stage';
   const chan = new BroadcastChannel('brk-stage');
   const send = m => chan.postMessage(m);
   const stageEl = $('#stage');
@@ -18,7 +18,7 @@ export function startStage() {
   const yt = new YTPlayer($('#yt'), {
     onState: s => report(s.ended),
     onTitle: () => report(false),
-    onError: message => send({ type: 'yt-error', message }),
+    onError: (message, code) => send({ type: 'yt-error', message, code }),
   });
   function report(ended) {
     send({ type: 'yt-state', t: yt.time, d: yt.duration, playing: yt.playing, title: yt.title, ended: !!ended });
@@ -30,7 +30,7 @@ export function startStage() {
     $('#idle .idle-big').textContent = big;
     $('#idle .idle-small').textContent = small;
   };
-  idle('Back Room Karaoke', '');
+  idle('Kami-oke', '');
 
   chan.onmessage = e => {
     const m = e.data;
@@ -44,7 +44,7 @@ export function startStage() {
       case 'song': {
         $('#upnext').hidden = true;
         stageEl.classList.remove('has-video', 'has-yt', 'no-video');
-        if (!m.song) { idle('Back Room Karaoke'); break; }
+        if (!m.song) { idle('Kami-oke'); break; }
         $('#idle').hidden = true;
         if (m.song.kind !== 'yt') { ytMode = false; yt.stop(); $('#yt').hidden = true; }
         if (m.song.video) {

@@ -21,6 +21,15 @@ if (isApp && window === window.top) {
     searchYouTube: q => ipcRenderer.send('yt:search', q),
     onYouTubePick: cb => ipcRenderer.on('yt:picked', (_e, v) => cb(v)),
     setAdBlock: on => ipcRenderer.send('adblock:set', !!on),
+    ytPage: {
+      open: o => ipcRenderer.invoke('ytpage:open', o),
+      bounds: b => ipcRenderer.send('ytpage:bounds', b),
+      visible: on => ipcRenderer.send('ytpage:visible', !!on),
+      host: which => ipcRenderer.send('ytpage:host', which),
+      cmd: (cmd, arg) => ipcRenderer.send('ytpage:cmd', { cmd, arg }),
+      close: () => ipcRenderer.send('ytpage:close'),
+      onState: cb => ipcRenderer.on('ytpage:state', (_e, st) => cb(st)),
+    },
   });
 }
 
@@ -74,7 +83,74 @@ if (isYouTube) {
 }
 
 /* ------------------------------------------------------------------ YouTube search window */
-const isSearchWindow = isYouTube && window === window.top && location.hostname === 'www.youtube.com';
+/* ------------------------------------------------------------------ YouTube page player */
+// For videos whose uploader blocks embedding, the app shows YouTube's own watch page in the
+// stage area. Here we trim that page to just the picture and let the app drive it.
+let pageInit = null;
+if (!isApp && window === window.top) { try { pageInit = ipcRenderer.sendSync('ytpage:init'); } catch {} }
+if (pageInit) {
+  webFrame.insertCSS(`
+    html, body { overflow: hidden !important; background: #000 !important; }
+    #masthead-container, #secondary, #below, #comments, ytd-mealbar-promo-renderer, tp-yt-paper-dialog, ytd-popup-container,
+    .ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, .ytp-gradient-bottom, .ytp-ce-element, .ytp-pause-overlay,
+    .ytp-endscreen-content, .ytp-cards-teaser, .ytp-paid-content-overlay, .ytp-autonav-endscreen, .iv-branding, .ytp-watermark,
+    .ytp-suggested-action, .ytp-contextmenu { display: none !important; }
+    #movie_player, #player-full-bleed-container, #full-bleed-container {
+      position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important;
+      max-height: none !important; z-index: 2147483000 !important; background: #000 !important; }
+    #movie_player video { width: 100% !important; height: 100% !important; left: 0 !important; top: 0 !important; object-fit: contain !important; }
+    #kamioke-howl { position: fixed; right: 2.4vw; bottom: 2.4vw; z-index: 2147483647; pointer-events: none;
+      font: 800 clamp(15px, 2.3vw, 26px)/1.15 system-ui, sans-serif; letter-spacing: .06em; color: #fff;
+      text-shadow: 0 1px 12px rgba(0,0,0,.8); display: flex; align-items: center; gap: .6em; opacity: 0; transition: opacity .6s; }
+    #kamioke-howl::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: #ff3d3d; box-shadow: 0 0 0 .18em rgba(255,61,61,.3); }
+    #kamioke-howl.on { opacity: 1; transition-duration: .25s; animation: kamioke-breathe 1.4s ease-in-out infinite; }
+    @keyframes kamioke-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  `);
+  const video = () => document.querySelector('#movie_player video') || document.querySelector('video');
+  const player = () => document.getElementById('movie_player');
+  let applied = false, lastSent = '', endedSent = false;
+  const apply = v => {
+    v.volume = Math.min(1, Math.max(0, pageInit.vol / 100));
+    v.muted = false;
+    if (pageInit.rate) v.playbackRate = pageInit.rate;
+    applied = true;
+  };
+  setInterval(() => {
+    const v = video(), pl = player();
+    // Some videos still can't play here (age checks, region locks); pass YouTube's own message on.
+    const err = document.querySelector('.ytp-error-content-wrap-reason, yt-playability-error-supported-renderers #reason');
+    if (err && err.textContent.trim()) { send({ blocked: err.textContent.trim() }); return; }
+    if (!v) return;
+    window.dispatchEvent(new Event('resize'));
+    const ad = !!(pl && (pl.classList.contains('ad-showing') || pl.classList.contains('ad-interrupting')));
+    if (!ad && !applied && v.readyState > 0) apply(v);
+    if (!ad && v.ended && !endedSent) { endedSent = true; ipcRenderer.send('ytpage:state', { ended: true }); return; }
+    send({ t: ad ? 0 : v.currentTime, d: ad ? 0 : v.duration || 0, playing: !v.paused && !ad, ad,
+      title: document.title.replace(/^\(\d+\)\s*/, '').replace(/\s+-\s+YouTube$/, '') });
+  }, 250);
+  function send(st) {
+    const key = JSON.stringify(st);
+    if (key !== lastSent || st.playing) { lastSent = key; ipcRenderer.send('ytpage:state', st); }
+  }
+  ipcRenderer.on('ytpage:cmd', (_e, c = {}) => {
+    const v = video();
+    switch (c.cmd) {
+      case 'play': v && v.play().catch(() => {}); break;
+      case 'pause': v && v.pause(); break;
+      case 'seek': if (v && isFinite(c.arg)) { v.currentTime = c.arg; endedSent = false; } break;
+      case 'volume': pageInit.vol = +c.arg || 0; if (v) v.volume = Math.min(1, Math.max(0, pageInit.vol / 100)); break;
+      case 'rate': pageInit.rate = +c.arg || 1; if (v) v.playbackRate = pageInit.rate; break;
+      case 'howl': {
+        let el = document.getElementById('kamioke-howl');
+        if (!el) { el = document.createElement('div'); el.id = 'kamioke-howl'; el.textContent = 'MOVE MICROPHONE AWAY FROM SPEAKERS'; document.documentElement.appendChild(el); }
+        el.classList.toggle('on', !!c.arg);
+        break;
+      }
+    }
+  });
+}
+
+const isSearchWindow = !pageInit && isYouTube && window === window.top && location.hostname === 'www.youtube.com';
 if (isSearchWindow) {
   const idOf = href => { const m = /(?:[?&]v=|\/shorts\/)([\w-]{11})/.exec(href || ''); return m && m[1]; };
   const titleNear = a => {
@@ -115,7 +191,7 @@ if (isSearchWindow) {
   window.addEventListener('DOMContentLoaded', () => {
     const tip = document.createElement('div');
     tip.style.cssText = 'position:fixed;right:16px;top:64px;z-index:2147483646;background:#1c1222;color:#f6f0fa;font:600 14px/1.35 system-ui,sans-serif;padding:10px 14px;border-radius:8px;border:1px solid #46344f;max-width:260px;box-shadow:0 8px 30px rgba(0,0,0,.4)';
-    tip.textContent = 'Click any video to add it to Back Room Karaoke. Close this window when you’re done.';
+    tip.textContent = 'Click any video to add it to Kami-oke. Close this window when you’re done.';
     document.documentElement.appendChild(tip);
     setTimeout(() => tip.remove(), 9000);
   });

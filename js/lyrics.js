@@ -171,7 +171,7 @@ export async function findLyricsOnline({ artist, title, duration }, fetchImpl = 
   const base = 'https://lrclib.net/api';
   const tryJson = async url => {
     try {
-      const r = await fetchImpl(url, { headers: { 'Lrclib-Client': 'BackRoomKaraoke/2 (github.com/terpenesalad/karaoke)' } });
+      const r = await fetchImpl(url, { headers: { 'Lrclib-Client': 'Kami-oke/2 (github.com/terpenesalad/karaoke)' } });
       if (!r.ok) return null;
       return await r.json();
     } catch { return null; }

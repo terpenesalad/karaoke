@@ -170,7 +170,7 @@ export function renderPane(app, tab) {
     ]) dl.append(h('div', null, h('dt', null, k), h('dd', null, v)));
     info.append(dl, h('p.hint', null, 'Bluetooth speakers and headphones add 150–250 ms of delay, which throws singers off. Use a cable or a USB audio interface if you can.'));
     const about = group('About');
-    about.append(h('p.hint', null, 'Back Room Karaoke 2. Your files and lyrics stay on this computer. Synced lyrics lookups use ', h('a', { href: 'https://lrclib.net', target: '_blank', rel: 'noopener' }, 'LRCLIB'), '. ',
+    about.append(h('p.hint', null, 'Kami-oke 2. Your files and lyrics stay on this computer. Synced lyrics lookups use ', h('a', { href: 'https://lrclib.net', target: '_blank', rel: 'noopener' }, 'LRCLIB'), '. ',
       h('a', { href: 'https://github.com/terpenesalad/karaoke', target: '_blank', rel: 'noopener' }, 'Source code and updates'), '.'));
   }
 

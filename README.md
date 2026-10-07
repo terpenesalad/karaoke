@@ -1,6 +1,6 @@
-# Back Room Karaoke
+# Kami-oke
 
-Karaoke for your living room. Sing over your own music with the lead vocal removed, pull up karaoke videos from YouTube, put the lyrics on the TV, and let the app handle the mic.
+Kami-oke (formerly Back Room Karaoke) is karaoke for your living room. Sing over your own music with the lead vocal removed, pull up karaoke videos from YouTube, put the lyrics on the TV, and let the app handle the mic.
 
 **[Download for Windows](https://github.com/terpenesalad/karaoke/releases/latest)** · or use it in a browser at **[terpenesalad.github.io/karaoke](https://terpenesalad.github.io/karaoke/)**
 
@@ -9,10 +9,10 @@ Karaoke for your living room. Sing over your own music with the lead vocal remov
 | Source | How | What works |
 | --- | --- | --- |
 | **Your own music and videos** | Drop files on the window, or **Add music files**. MP3, M4A, WAV, OGG, FLAC, MP4, WebM, MKV, MOV. | Everything: vocal remover, key change, tempo, synced lyrics, recording. |
-| **YouTube karaoke videos** | **Find on YouTube**, then click any video (desktop app), or paste a link. | Words are already on screen. Music fader and tempo apply. Ads are blocked in the desktop app. |
+| **YouTube karaoke videos** | **Find on YouTube**, then click any video (desktop app), or paste a link. | Words are already on screen. Music fader and tempo apply. Ads are blocked in the desktop app. If an uploader blocks embedding, the desktop app plays that video on YouTube's own watch page inside the stage instead. |
 | **Built-in sing-alongs** | Listed under *Sing-alongs*. Public-domain songs with original arrangements. | Melody lane and an on-key score. |
 
-The app plays YouTube through YouTube's own embedded player rather than downloading videos.
+The app plays YouTube through YouTube's own player (embedded, or YouTube's watch page for videos that can't be embedded) and never downloads videos.
 
 ## Lyrics
 
@@ -37,7 +37,7 @@ The app plays YouTube through YouTube's own embedded player rather than download
 
 - Every control works from the keyboard, with a visible focus ring. Press `?` for shortcuts.
 - Screen-reader labels throughout, announcements for song changes and feedback, and an option to read each lyric line aloud as it comes up.
-- Atkinson Hyperlegible lettering, adjustable interface and lyric size, and *Back room*, *Daylight* and *High contrast* themes. Respects Windows high-contrast mode.
+- Atkinson Hyperlegible lettering, adjustable interface and lyric size, and *Night*, *Daylight* and *High contrast* themes. Respects Windows high-contrast mode.
 - Reduce motion: lyrics change instantly instead of wiping and sliding.
 - Checked with axe-core (WCAG 2.1 AA) across every panel and theme.
 
@@ -57,7 +57,7 @@ The app plays YouTube through YouTube's own embedded player rather than download
 - **Vocal remover**: cancels what's panned dead centre between 160 Hz and 9 kHz (adjustable), keeps centred bass and kick, and folds a delayed copy of the side signal back in so it still works on mono speakers.
 - **Key change**: an offline phase vocoder with identity phase locking and a windowed-sinc resampler, running in a Web Worker at about 45× real time. It shares one phase rotation across both channels, so the vocal remover still works after a key change.
 - **Feedback detection**: watches for a narrow, sustained tone with weak harmonics that holds or grows — which a sung note doesn't — then adds a tight notch filter.
-- **Desktop app**: Electron. Serves the app from a private `127.0.0.1` server that only streams files you've added (with seeking), grants only the microphone, and blocks YouTube ads in three layers: network requests to ad servers, ad slots stripped from player data, and auto-skip for anything left.
+- **Desktop app**: Electron. Serves the app from a private `127.0.0.1` server that only streams files you've added (with seeking), grants only the microphone, shows YouTube's watch page over the stage for videos whose uploader blocks embedding, and blocks YouTube ads in three layers: network requests to ad servers, ad slots stripped from player data, and auto-skip for anything left.
 
 ## Building
 

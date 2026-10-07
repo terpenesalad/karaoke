@@ -1,7 +1,7 @@
 {
-  "name": "back-room-karaoke",
-  "productName": "Back Room Karaoke",
-  "version": "2.0.1",
+  "name": "kami-oke",
+  "productName": "Kami-oke",
+  "version": "2.1.0",
   "description": "Karaoke for your living room: vocal remover, key change, synced lyrics, live voice effects, YouTube karaoke, stage screen.",
   "author": "terpenesalad",
   "homepage": "https://github.com/terpenesalad/karaoke",
@@ -18,19 +18,39 @@
   },
   "build": {
     "appId": "io.github.terpenesalad.karaoke",
-    "productName": "Back Room Karaoke",
+    "productName": "Kami-oke",
     "copyright": "terpenesalad",
-    "directories": { "output": "dist", "buildResources": "build" },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "files": [
-      "index.html", "css/**", "js/**", "fonts/**", "build/icon.svg", "build/icon.png",
-      "electron/**", "package.json", "!**/*.test.js"
+      "index.html",
+      "css/**",
+      "js/**",
+      "fonts/**",
+      "build/icon.svg",
+      "build/icon.png",
+      "electron/**",
+      "package.json",
+      "!**/*.test.js"
     ],
     "asar": true,
     "win": {
       "icon": "build/icon.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -38,11 +58,11 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Back Room Karaoke",
-      "artifactName": "Back-Room-Karaoke-Setup-${version}.${ext}"
+      "shortcutName": "Kami-oke",
+      "artifactName": "Kami-oke-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "Back-Room-Karaoke-${version}-Portable.${ext}"
+      "artifactName": "Kami-oke-${version}-Portable.${ext}"
     }
   }
 }

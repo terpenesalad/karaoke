@@ -61,7 +61,7 @@ export const TOGGLES = [
 ];
 
 export const THEMES = [
-  ['velvet', 'Back room'], ['daylight', 'Daylight'], ['contrast', 'High contrast'],
+  ['velvet', 'Night'], ['daylight', 'Daylight'], ['contrast', 'High contrast'],
 ];
 
 export const PRESETS = {
